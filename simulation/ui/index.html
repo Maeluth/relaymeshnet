@@ -1,0 +1,68 @@
+﻿<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RelayMeshNet (RMN)</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0d1117;color:#c9d1d9;font-family:monospace;overflow:hidden;height:100vh;display:flex}
+#sidebar{width:340px;background:#161b22;padding:10px;overflow-y:auto;border-right:1px solid #30363d;flex-shrink:0;font-size:11px}
+#canvas-wrap{flex:1;position:relative}
+canvas{display:block;cursor:pointer}
+#tooltip{position:absolute;background:#1c2128;border:1px solid #58a6ff;padding:8px 12px;border-radius:4px;pointer-events:none;display:none;font-size:11px;white-space:pre;z-index:10;box-shadow:0 0 8px rgba(0,0,0,0.5)}
+h2{font-size:13px;color:#58a6ff;margin:8px 0 4px}
+.stat{display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid #21262d}
+.stat .l{color:#8b949e}.stat .v{font-weight:bold}.g{color:#3fb950}.r{color:#f85149}.y{color:#d29922}
+.ctrl{margin:2px 0}
+.ctrl label{font-size:10px;color:#8b949e;display:block}
+.ctrl input[type=range]{width:100%;margin:1px 0}
+.ctrl .val{color:#58a6ff;float:right}
+button{background:#238636;color:#fff;border:none;padding:5px 10px;border-radius:4px;cursor:pointer;font-size:11px;margin:3px 2px}
+button:hover{background:#2ea043}
+#events{margin-top:6px;max-height:120px;overflow-y:auto;font-size:10px;line-height:1.3}
+#events .e{padding:1px 0;border-bottom:1px solid #21262d}
+.e.sent{color:#3fb950}.e.failed{color:#f85149}.e.received{color:#58a6ff}
+.legend{font-size:10px;margin-top:4px;line-height:1.4}
+.legend span{display:inline-flex;align-items:center;gap:4px}
+.legend .dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex-shrink:0}
+</style>
+</head>
+<body>
+<div id="sidebar">
+  <h2>RelayMeshNet (RMN)</h2>
+  <div id="stats"></div>
+
+  <h2>Параметры сети</h2>
+  <div class="ctrl"><label>Скорость: <span class="val" id="speedVal">10x</span></label><input type="range" id="speed" min="1" max="200" value="10"></div>
+  <div class="ctrl"><label>Квартир в длину: <span class="val" id="gwVal">50</span></label><input type="range" id="gridWidth" min="10" max="80" value="50"></div>
+  <div class="ctrl"><label>Этажей: <span class="val" id="ghVal">10</span></label><input type="range" id="gridHeight" min="3" max="20" value="10"></div>
+  <div class="ctrl"><label>WiFi радиус: <span class="val" id="wifiVal">30м</span></label><input type="range" id="wifiRange" min="5" max="100" value="30"></div>
+  <div class="ctrl"><label>LoRa радиус: <span class="val" id="loraVal">200м</span></label><input type="range" id="loraRange" min="50" max="5000" value="200"></div>
+  <div class="ctrl"><label>Ширина квартиры: <span class="val" id="cwVal">20м</span></label><input type="range" id="cellWidth" min="5" max="30" value="20"></div>
+  <div class="ctrl"><label>Высота этажа: <span class="val" id="chVal">4м</span></label><input type="range" id="cellHeight" min="2" max="6" value="4"></div>
+  <div class="ctrl"><label>Затухание стены: <span class="val" id="waVal">10dB</span></label><input type="range" id="wallAtten" min="0" max="30" value="10"></div>
+  <div class="ctrl"><label>Затухание перекрытия: <span class="val" id="faVal">15dB</span></label><input type="range" id="floorAtten" min="0" max="40" value="15"></div>
+  <div style="margin-top:6px"><button onclick="resetSim()">Сброс мира</button></div>
+
+  <canvas id="graph" width="320" height="90" style="margin-top:6px;background:#0d1117;border:1px solid #21262d;border-radius:4px"></canvas>
+  <canvas id="graph2" width="320" height="90" style="margin-top:4px;background:#0d1117;border:1px solid #21262d;border-radius:4px"></canvas>
+  <canvas id="graph3" width="320" height="75" style="margin-top:4px;background:#0d1117;border:1px solid #21262d;border-radius:4px"></canvas>
+  <canvas id="graph4" width="320" height="75" style="margin-top:4px;background:#0d1117;border:1px solid #21262d;border-radius:4px"></canvas>
+
+  <div class="legend">
+    <h2>Легенда</h2>
+    <span><span class="dot" style="background:#3fb950"></span> Баланс > 10</span>
+    <span><span class="dot" style="background:#f85149"></span> Долг < -50</span>
+    <span><span class="dot" style="background:#d29922"></span> ~0</span>
+    <span><span class="dot" style="background:#484f58"></span> Офлайн</span>
+    <span><span style="color:#58a6ff">━</span> WiFi линк</span>
+    <span><span style="color:#f0883e">╌</span> LoRa линк</span>
+    <span><span style="color:#f778ba">●</span> Сообщение в пути</span>
+  </div>
+  <div id="events"><h2>События</h2></div>
+</div>
+<div id="canvas-wrap"><canvas id="canvas"></canvas><div id="tooltip"></div></div>
+<script src="app.js"></script>
+</body>
+</html>

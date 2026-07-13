@@ -1,0 +1,294 @@
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"log"
+	"math"
+	"net/http"
+	"sync"
+	"sync/atomic"
+	"time"
+)
+
+var world *World
+
+func main() {
+	cfg := DefaultConfig()
+	world = NewWorld(cfg)
+
+	http.HandleFunc("/api/state", cors(handleState))
+	http.HandleFunc("/api/config", cors(handleConfig))
+	http.HandleFunc("/api/toggle-node", cors(handleToggleNode))
+	http.HandleFunc("/api/speed", cors(handleSpeed))
+	http.Handle("/", http.FileServer(http.Dir("ui")))
+
+	var lastTickCount int
+	var lastTime time.Time
+
+	go func() {
+		ticker := time.NewTicker(100 * time.Millisecond)
+		lastTime = time.Now()
+		for range ticker.C {
+			world.mu.RLock()
+			speed := world.Speed
+			world.mu.RUnlock()
+			if speed > 0 {
+				steps := int(float64(speed) * TicksPerSecond * 0.1)
+				if steps < 1 { steps = 1 }
+				world.RunSteps(steps)
+			}
+			now := time.Now()
+			elapsed := now.Sub(lastTime).Seconds()
+			if elapsed >= 5 {
+				world.mu.Lock()
+				world.TPS = int(float64(world.Tick-lastTickCount) / elapsed)
+				world.mu.Unlock()
+				lastTickCount = world.Tick
+				lastTime = now
+			}
+		}
+	}()
+
+	fmt.Println("RelayMeshNet (RMN) Simulation: http://localhost:8080")
+	log.Fatal(http.ListenAndServe(":8080", nil))
+}
+
+func cors(h http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET,POST,OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		if r.Method == "OPTIONS" {
+			return
+		}
+		h(w, r)
+	}
+}
+
+func handleState(w http.ResponseWriter, r *http.Request) {
+	state := worldToState(world)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(state)
+}
+
+var configMu sync.Mutex
+
+func handleConfig(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "POST" {
+		configMu.Lock()
+		defer configMu.Unlock()
+
+		var cfg Config
+		if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
+			http.Error(w, "bad config", 400)
+			return
+		}
+
+		forceReset := r.URL.Query().Get("reset") == "true"
+
+		world.mu.RLock()
+		gridChanged := cfg.GridWidth != world.Config.GridWidth ||
+			cfg.GridHeight != world.Config.GridHeight ||
+			cfg.CellWidth != world.Config.CellWidth ||
+			cfg.CellHeight != world.Config.CellHeight ||
+			cfg.NodesPerCell != world.Config.NodesPerCell
+		world.mu.RUnlock()
+
+		if gridChanged || forceReset {
+			oldSpeed := world.Speed
+			world = NewWorld(cfg)
+			world.mu.Lock()
+			world.Speed = oldSpeed
+			world.mu.Unlock()
+		} else {
+			world.mu.Lock()
+			world.Config.WiFiRange = cfg.WiFiRange
+			world.Config.LoRaRange = cfg.LoRaRange
+			world.Config.WallAtten = cfg.WallAtten
+			world.Config.FloorAtten = cfg.FloorAtten
+			world.Config.NodeUptime = cfg.NodeUptime
+			world.Config.DefaultHops = cfg.DefaultHops
+			world.Config.CreditBase = cfg.CreditBase
+			world.Config.RelayReward = cfg.RelayReward
+			world.Config.SendCost = cfg.SendCost
+			world.Config.StorageReward = cfg.StorageReward
+			world.Config.BurnRate = cfg.BurnRate
+			world.Config.ConfirmThreshold = cfg.ConfirmThreshold
+			world.Config.RelayChunkSize = cfg.RelayChunkSize
+			world.mu.Unlock()
+		}
+	}
+	state := worldToState(world)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(state)
+}
+
+func handleToggleNode(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		return
+	}
+	var req struct {
+		X int `json:"x"`
+		Y int `json:"y"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		return
+	}
+	world.ToggleNode(req.X, req.Y)
+	w.WriteHeader(200)
+}
+
+func handleSpeed(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "POST" {
+		var req struct {
+			Speed int `json:"speed"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err == nil {
+			world.mu.Lock()
+			world.Speed = req.Speed
+			world.mu.Unlock()
+		}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]int{"speed": world.Speed})
+}
+
+type UIState struct {
+	Tick       int        `json:"tick"`
+	Speed      int        `json:"speed"`
+	GridWidth  int        `json:"gridWidth"`
+	GridHeight int        `json:"gridHeight"`
+	CellWidth  float64    `json:"cellWidth"`
+	CellHeight float64    `json:"cellHeight"`
+	WiFiRange  float64    `json:"wifiRange"`
+	LoRaRange  float64    `json:"loraRange"`
+	Nodes      []UINode   `json:"nodes"`
+	Messages   []UIMessage `json:"messages"`
+	Events     []UIEvent  `json:"events"`
+	Stats      UIStats    `json:"stats"`
+}
+
+type UINode struct {
+	ID         string  `json:"id"`
+	X          int     `json:"x"`
+	Y          int     `json:"y"`
+	Name       string  `json:"name"`
+	Online     bool    `json:"online"`
+	Profile    int     `json:"profile"`
+	Balance    float64 `json:"balance"`
+	Reputation float64 `json:"reputation"`
+	Available  float64 `json:"available"`
+	RelayOut   float64 `json:"relayOut"`
+	SentCount  int     `json:"sentCount"`
+	RecvCount  int     `json:"recvCount"`
+}
+
+type UIMessage struct {
+	ID        string   `json:"id"`
+	From      string   `json:"from"`
+	To        string   `json:"to"`
+	Path      []string `json:"path"`
+	Remaining int      `json:"remaining"`
+	Total     int      `json:"total"`
+	Size      int      `json:"size"`
+	MsgType   string   `json:"msgType"`
+}
+
+type UIEvent struct {
+	Tick int    `json:"tick"`
+	Type string `json:"type"`
+	Msg  string `json:"msg"`
+}
+
+type UIStats struct {
+	TotalSent     int     `json:"totalSent"`
+	TotalReceived int     `json:"totalReceived"`
+	TotalFailed   int     `json:"totalFailed"`
+	TotalRelayed  int     `json:"totalRelayed"`
+	TotalRELAY    float64 `json:"totalRelay"`
+	OnlineNodes   int     `json:"onlineNodes"`
+	ActiveMsgs    int     `json:"activeMsgs"`
+	GreenCount    int     `json:"greenCount"`
+	YellowCount   int     `json:"yellowCount"`
+	RedCount      int     `json:"redCount"`
+	TotalSupply   float64 `json:"totalSupply"`
+	TotalTransfers int    `json:"totalTransfers"`
+	TPS           int     `json:"tps"`
+}
+
+func worldToState(w *World) UIState {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+
+	state := UIState{
+		Tick:       w.Tick,
+		Speed:      w.Speed,
+		GridWidth:  w.Config.GridWidth,
+		GridHeight: w.Config.GridHeight,
+		CellWidth:  w.Config.CellWidth,
+		CellHeight: w.Config.CellHeight,
+		WiFiRange:  w.Config.WiFiRange,
+		LoRaRange:  w.Config.LoRaRange,
+		Stats: UIStats{
+			TotalSent:     int(atomic.LoadInt64(&w.TotalSent)),
+			TotalReceived: int(atomic.LoadInt64(&w.TotalReceived)),
+			TotalFailed:   int(atomic.LoadInt64(&w.TotalFailed)),
+			TotalRelayed:  int(atomic.LoadInt64(&w.TotalRelayed)),
+			TotalRELAY:    float64(atomic.LoadInt64(&w.TotalRELAY)) / 100.0,
+			OnlineNodes:   len(w.OnlineNodes()),
+			ActiveMsgs:    len(w.ActiveMessages),
+			GreenCount:    w.CountByBalance(10, 1e9),
+			YellowCount:   w.CountByBalance(-50, 10),
+			RedCount:      w.CountByBalance(-1e9, -50),
+			TotalSupply:   w.TotalSupply(),
+			TotalTransfers: int(atomic.LoadInt64(&w.TotalTransfers)),
+			TPS:           w.TPS,
+		},
+	}
+
+	for _, n := range w.AllNodes() {
+		state.Nodes = append(state.Nodes, UINode{
+			ID:         n.PeerID()[:8],
+			X:          n.X,
+			Y:          n.Y,
+			Name:       n.Name,
+			Online:     n.Status == StatusOnline,
+			Profile:    int(n.Profile),
+			Balance:    math.Round(n.Balance*100) / 100,
+			Reputation: math.Round(n.Reputation*100) / 100,
+			Available:  math.Round(n.Available()*100) / 100,
+			RelayOut:   math.Round(n.RelayBytesOut/1024*100) / 100,
+			SentCount:  n.SentCount,
+			RecvCount:  n.ReceivedCount,
+		})
+	}
+
+	for _, msg := range w.ActiveMessages {
+		state.Messages = append(state.Messages, UIMessage{
+			ID:        msg.ID,
+			From:      msg.From[:8],
+			To:        msg.To[:8],
+			Path:      msg.Path,
+			Remaining: msg.Remaining,
+			Total:     msg.Total,
+			Size:      msg.Size,
+			MsgType:   msg.MsgType,
+		})
+	}
+
+	start := 0
+	if len(w.Events) > 50 {
+		start = len(w.Events) - 50
+	}
+	for i := start; i < len(w.Events); i++ {
+		e := w.Events[i]
+		state.Events = append(state.Events, UIEvent{
+			Tick: e.Tick,
+			Type: e.Type,
+			Msg:  e.Msg,
+		})
+	}
+
+	return state
+}

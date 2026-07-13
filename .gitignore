@@ -1,0 +1,30 @@
+# Binaries
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Simulation build
+simulation/mesh-sim.exe
+
+# Go
+*.test
+*.out
+go.sum
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Environment
+.env
+*.log
+
+# Build artifacts
+simulation/build/
+simulation/dist/
+simulation/__pycache__/
