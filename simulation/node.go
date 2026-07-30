@@ -29,6 +29,8 @@ type MsgType int
 const (
 	MsgText MsgType = iota
 	MsgFile
+	MsgMulticast // групповое сообщение
+	MsgFirmware  // обновление прошивки
 )
 
 type Node struct {
@@ -186,6 +188,7 @@ func (n *Node) ConfirmNRequired(msgBytes, hops int) int {
 
 func (n *Node) Tick() {
 	// Reputation demurrage (~1% в месяц, ~0.000022% в тик при 500 тиках/мин)
+	// Применяется только к Reputation, НЕ к EWMAWork (чтобы не было двойного decay)
 	repDemurrage := 0.00000022
 	if n.Status != StatusOnline {
 		repDemurrage *= 2.0 // ×2 для офлайн
@@ -198,6 +201,8 @@ func (n *Node) Tick() {
 	if n.Status != StatusOnline { return }
 	n.Uptime += SecondsPerTick / 3600.0
 
+	// EWMAWork decay (half-life = 7 days = 604800 seconds)
+	// НЕ применяем demurrage здесь, только decay для EWMA
 	decayFactor := math.Exp(-SecondsPerTick * math.Ln2 / 604800.0)
 	n.EWMAWork *= decayFactor
 

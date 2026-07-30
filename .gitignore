@@ -28,3 +28,4 @@ Thumbs.db
 simulation/build/
 simulation/dist/
 simulation/__pycache__/
+DEVNOTES.md

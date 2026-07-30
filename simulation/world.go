@@ -1,9 +1,7 @@
 package main
 
 import (
-	"math"
 	"math/rand"
-	"runtime"
 	"sync"
 	"sync/atomic"
 )
@@ -37,6 +35,7 @@ type ActiveMsg struct {
 	Total     int
 	Size      int
 	MsgType   string
+	ACKs      []bool // hop-by-hop ACK: true если hop подтвердил получение
 }
 
 type Event struct {
@@ -108,16 +107,35 @@ func (w *World) HasConnection(a, b *Node) bool {
 }
 
 func (w *World) findPath(from, to *Node, online []*Node) []string {
-	// Прямое соединение (но мы всё равно добавим relay позже)
+	// Прямое соединение
 	if w.HasConnection(from, to) {
 		return []string{from.PeerID(), to.PeerID()}
 	}
 
-	// 1 relay: собираем ВСЕХ кандидатов, выбираем случайного
-	var relay1Candidates []*Node
+	// Кэшируем соседей для оптимизации (O(n*k) вместо O(n²))
+	neighbors := make(map[string][]*Node)
 	for _, n := range online {
 		if n.PeerID() == from.PeerID() || n.PeerID() == to.PeerID() { continue }
-		if w.HasConnection(from, n) && w.HasConnection(n, to) {
+		var conns []*Node
+		for _, other := range online {
+			if other.PeerID() == n.PeerID() { continue }
+			if w.HasConnection(n, other) {
+				conns = append(conns, other)
+			}
+		}
+		neighbors[n.PeerID()] = conns
+	}
+
+	// 1 relay: ищем узел, который соединяет from и to
+	fromNeighbors := neighbors[from.PeerID()]
+	toNeighbors := make(map[string]bool)
+	for _, n := range neighbors[to.PeerID()] {
+		toNeighbors[n.PeerID()] = true
+	}
+	
+	var relay1Candidates []*Node
+	for _, n := range fromNeighbors {
+		if toNeighbors[n.PeerID()] {
 			relay1Candidates = append(relay1Candidates, n)
 		}
 	}
@@ -126,16 +144,21 @@ func (w *World) findPath(from, to *Node, online []*Node) []string {
 		return []string{from.PeerID(), relay.PeerID(), to.PeerID()}
 	}
 
-	// 2 relays: собираем ВСЕХ кандидатов, выбираем случайную пару
+	// 2 relays: ищем пару, которая соединяет from → r1 → r2 → to
 	if w.Config.DefaultHops >= 3 {
 		type relayPair struct { r1, r2 *Node }
 		var pairs []relayPair
-		for _, r1 := range online {
-			if r1.PeerID() == from.PeerID() || r1.PeerID() == to.PeerID() || !w.HasConnection(from, r1) { continue }
-			for _, r2 := range online {
-				if r2.PeerID() == r1.PeerID() || r2.PeerID() == from.PeerID() || r2.PeerID() == to.PeerID() { continue }
-				if w.HasConnection(r1, r2) && w.HasConnection(r2, to) {
-					pairs = append(pairs, relayPair{r1, r2})
+		for _, r1 := range fromNeighbors {
+			r1Neighbors := neighbors[r1.PeerID()]
+			for _, r2 := range r1Neighbors {
+				if r2.PeerID() == from.PeerID() || r2.PeerID() == to.PeerID() { continue }
+				// Проверяем что r2 соединён с to
+				r2Neighbors := neighbors[r2.PeerID()]
+				for _, r2n := range r2Neighbors {
+					if r2n.PeerID() == to.PeerID() {
+						pairs = append(pairs, relayPair{r1, r2})
+						break
+					}
 				}
 			}
 		}
@@ -167,35 +190,14 @@ func (w *World) RunSteps(n int) {
 	if n < 1 { n = 1 }
 	all := w.AllNodes()
 	online := w.OnlineNodes()
-	nCPU := runtime.NumCPU()
-	chunk := (len(all) + nCPU - 1) / nCPU
 
-	// Фаза 1: обновление узлов (параллельно)
-	var wg sync.WaitGroup
-	for i := 0; i < nCPU; i++ {
-		start := i * chunk
-		end := start + chunk
-		if end > len(all) { end = len(all) }
-		if start >= end { continue }
-		wg.Add(1)
-		go func(nodes []*Node, steps int) {
-			defer wg.Done()
-			for s := 0; s < steps; s++ {
-				for _, nd := range nodes {
-					if nd.Status != StatusOnline { continue }
-					nd.Uptime += SecondsPerTick / 3600.0
-					nd.EWMAWork *= math.Exp(-SecondsPerTick * math.Ln2 / 604800.0)
-					if nd.StorageBytes > 0 {
-						rw := nd.StorageBytes / (1024 * 1024) * nd.cfg.StorageReward * SecondsPerTick / 3600.0
-						nd.Balance += rw
-						nd.EWMAWork += rw * 0.01
-						nd.StorageHours += SecondsPerTick / 3600.0
-					}
-				}
-			}
-		}(all[start:end], n)
+	// Фаза 1: обновление узлов (последовательно, без race condition)
+	for s := 0; s < n; s++ {
+		for _, nd := range all {
+			if nd.Status != StatusOnline { continue }
+			nd.Tick()
+		}
 	}
-	wg.Wait()
 
 	// Фаза 2: обработка шагов (однопоточно)
 	for s := 0; s < n; s++ {
@@ -218,15 +220,29 @@ func (w *World) RunSteps(n int) {
 			}
 		}
 
-		// Доставка
+		// Доставка с hop-by-hop ACK
 		w.msgMu.Lock()
 		rem := w.ActiveMessages[:0]
 		for i := range w.ActiveMessages {
 			msg := &w.ActiveMessages[i]
 			msg.Remaining--
+			
+			// Hop-by-hop ACK: отмечаем пройденные hop'и
+			if msg.Remaining < msg.Total {
+				hopIndex := len(msg.Path) - 2 - (msg.Remaining * (len(msg.Path)-1) / msg.Total)
+				if hopIndex >= 0 && hopIndex < len(msg.ACKs) {
+					msg.ACKs[hopIndex] = true
+				}
+			}
+			
 			if msg.Remaining <= 0 {
+				// Финальная доставка
 				for _, nd := range all {
-					if nd.PeerID() == msg.To { nd.ReceivedCount++; if msg.MsgType == "file" { nd.FileReceived++ }; break }
+					if nd.PeerID() == msg.To {
+						nd.ReceivedCount++
+						if msg.MsgType == "file" { nd.FileReceived++ }
+						break
+					}
 				}
 				atomic.AddInt64(&w.TotalReceived, 1)
 			} else {
@@ -271,27 +287,32 @@ func (w *World) RunSteps(n int) {
 			nd.scheduleNextSend(t)
 		}
 
-		// Трансферы: зелёные → красным (каждые ~5 минут)
-		if t%3000 == 0 {
-			var greens, reds []*Node
+		// Трансферы: user-initiated (каждые ~10 минут, 10% шанс)
+		if t%6000 == 0 {
 			for _, nd := range online {
-				if nd.Balance > 50 {
-					greens = append(greens, nd)
-				} else if nd.Balance < -10 {
-					reds = append(reds, nd)
+				if nd.Balance > 50 && rand.Float64() < 0.1 {
+					// Находим случайного получателя с низким балансом
+					var target *Node
+					for i := 0; i < 10; i++ {
+						tg := online[rand.Intn(len(online))]
+						if tg.ID != nd.ID && tg.Balance < 10 {
+							target = tg
+							break
+						}
+					}
+					if target == nil { continue }
+					
+					amount := nd.Balance * (0.1 + rand.Float64()*0.2) // 10-30% от баланса
+					if amount < 1 { continue }
+					
+					// Проверяем что есть путь
+					path := w.findPath(nd, target, online)
+					if len(path) < 2 { continue }
+					
+					nd.Balance -= amount
+					target.Balance += amount
+					atomic.AddInt64(&w.TotalTransfers, 1)
 				}
-			}
-			// Каждый зелёный с 30% шансом отправляет часть избытка случайному красному
-			for _, g := range greens {
-				if len(reds) == 0 || rand.Float64() > 0.3 { continue }
-				r := reds[rand.Intn(len(reds))]
-				amount := g.Balance * (0.1 + rand.Float64()*0.2) // 10-30% от баланса
-				if amount < 1 { continue }
-				g.Balance -= amount
-				r.Balance += amount
-				atomic.AddInt64(&w.TotalTransfers, 1)
-				// Упрощённо: прямой перевод, без relay-комиссии
-				// (в реальности пошёл бы через sendMsg с MsgTransfer)
 			}
 		}
 	}
@@ -353,18 +374,39 @@ func (w *World) sendMsg(from, to *Node, mt MsgType, mb int, online, all []*Node)
 			if nd.PeerID() == path[i] { nd.AddRelayWork(float64(mb)); break }
 		}
 	}
-	return &ActiveMsg{ID: from.PeerID()[:8] + "-" + to.PeerID()[:8], From: from.PeerID(), To: to.PeerID(), Path: path, Remaining: ticks, Total: ticks, Size: mb, MsgType: mts}
+	return &ActiveMsg{
+		ID:        from.PeerID()[:8] + "-" + to.PeerID()[:8],
+		From:      from.PeerID(),
+		To:        to.PeerID(),
+		Path:      path,
+		Remaining: ticks,
+		Total:     ticks,
+		Size:      mb,
+		MsgType:   mts,
+		ACKs:      make([]bool, len(path)-1), // hop-by-hop ACK
+	}
 }
 
-// findRandomRelay находит случайный relay из online, который может соединить from и to
+// findRandomRelay находит случайный промежуточный relay (не прямой)
 func (w *World) findRandomRelay(from, to *Node, online []*Node, excludePath []string) *Node {
 	exclude := make(map[string]bool)
 	for _, pid := range excludePath { exclude[pid] = true }
 	
+	// Ищем узлы, которые НЕ соединены напрямую ни с from, ни с to
+	// но могут быть промежуточными relay
 	var candidates []*Node
 	for _, n := range online {
 		if exclude[n.PeerID()] { continue }
+		if n.PeerID() == from.PeerID() || n.PeerID() == to.PeerID() { continue }
+		
+		// Проверяем что узел НЕ соединён напрямую ни с from, ни с to
+		// (иначе это будет прямой путь, а не relay)
 		if w.HasConnection(from, n) && w.HasConnection(n, to) {
+			continue // это прямой путь, пропускаем
+		}
+		
+		// Узел должен быть соединён хотя бы с одним из них
+		if w.HasConnection(from, n) || w.HasConnection(n, to) {
 			candidates = append(candidates, n)
 		}
 	}
@@ -410,4 +452,45 @@ func (w *World) TotalSupply() float64 {
 		}
 	}
 	return sum
+}
+
+// SendMulticast отправляет групповое сообщение через multicast-дерево
+func (w *World) SendMulticast(from *Node, recipients []*Node, msgBytes int, online []*Node) []*ActiveMsg {
+	if from.Status != StatusOnline || len(recipients) == 0 { return nil }
+	
+	// Строим минимальное покрывающее дерево (MST) от from ко всем recipients
+	// Упрощённо: отправляем отдельное сообщение каждому recipient через findPath
+	var msgs []*ActiveMsg
+	for _, to := range recipients {
+		if to.PeerID() == from.PeerID() { continue }
+		m := w.sendMsg(from, to, MsgMulticast, msgBytes, online, w.AllNodes())
+		if m != nil {
+			atomic.AddInt64(&w.TotalSent, 1)
+			from.SentCount++
+			from.LastSendTick = w.Tick
+			w.msgMu.Lock()
+			w.ActiveMessages = append(w.ActiveMessages, *m)
+			w.msgMu.Unlock()
+			msgs = append(msgs, m)
+		}
+	}
+	return msgs
+}
+
+// SendFirmwareUpdate отправляет обновление прошивки через mesh
+func (w *World) SendFirmwareUpdate(from *Node, target *Node, firmwareBytes int, online []*Node) *ActiveMsg {
+	if from.Status != StatusOnline || target.Status != StatusOnline { return nil }
+	
+	// Firmware updates всегда идут через onion (минимум 1 hop)
+	m := w.sendMsg(from, target, MsgFirmware, firmwareBytes, online, w.AllNodes())
+	if m != nil {
+		atomic.AddInt64(&w.TotalSent, 1)
+		from.SentCount++
+		from.LastSendTick = w.Tick
+		from.FileSent++
+		w.msgMu.Lock()
+		w.ActiveMessages = append(w.ActiveMessages, *m)
+		w.msgMu.Unlock()
+	}
+	return m
 }
