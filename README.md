@@ -2,7 +2,7 @@
 
 **Decentralized mesh network with built-in tokenomics — designed to work without internet.**
 
-[![Architecture](https://img.shields.io/badge/modules-25-blue)]()
+[![Architecture](https://img.shields.io/badge/modules-28-blue)]()
 [![Simulation](https://img.shields.io/badge/simulation-Go-green)]()
 [![Stage](https://img.shields.io/badge/stage-design%20%2B%20simulation-orange)]()
 
@@ -95,6 +95,9 @@ go run .
 | 22 | Deployment params (frequencies, EIRP, LoRa range, cross-compilation) |
 | 23 | Firmware ecosystem (multi-developer, Ed25519 signing, BitTorrent distribution) |
 | 24 | QoS & Multi-path (TCP/UDP modes, WiFi+LoRa striping, LoRa budget, compression) |
+| 25 | Node lifecycle (BOOTSTRAP → SANDBOX → RAMP-UP → ACTIVE → TRUSTED) |
+| 26 | Identity export/import (encrypted backup, cross-device sync, physical transfer) |
+| 27 | Cold restart (recovery phases, partial/full restart, fresh network bootstrap) |
 
 ## Status
 

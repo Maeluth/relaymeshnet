@@ -109,22 +109,40 @@ LoRa SF12 = 293 бит/с × 86400 сек × 1% duty cycle ≈ 31 KB/день н
   → Отправитель получает "LoRa budget exhausted, retry WiFi or wait"
 ```
 
-## Адаптивный выбор: WiFi через N hop'ов vs LoRa напрямую
+## Адаптивный выбор: WiFi через N hop'ов vs LoRa через M hop'ов
 
-Иногда LoRa напрямую быстрее чем WiFi через 5+ hop'ов:
+Все пользовательские сообщения идут через минимум 1 relay (MIN_RELAY_HOPS).
+Но количество hop'ов и тип канала можно выбирать для оптимизации:
 
 ```
 Узел A → Узел D (расстояние 50 м, но WiFi зашумлён):
 
-WiFi путь: A→R1→R2→R3→R4→D (5 hop'ов)
+WiFi путь: A→R1→R2→D (2 relay, 3 hop'а всего)
   Каждый hop: 5ms + обработка 5ms = 10ms
-  Итого: 5 × 10ms = 50ms
+  Итого: 3 × 10ms = 30ms
 
-LoRa SF7 напрямую: A→D (0 hop'ов)
-  Air time + обработка: 50ms
+LoRa SF7 путь: A→R3→D (1 relay, 2 hop'а всего)
+  Air time + relay = 50ms + 50ms = 100ms
 
-  → LoRa БЫСТРЕЕ чем WiFi!
+  → WiFi БЫСТРЕЕ даже с дополнительным relay!
+
+LoRa SF7 путь: A→R3→D (1 relay)
+  vs
+WiFi путь: A→R1→R2→R3→R4→R5→D (5 relay, 6 hop'ов)
+  WiFi: 6 × 10ms = 60ms
+  LoRa: 2 × 50ms = 100ms
+
+  → WiFi ВСЁ ЕЩЁ быстрее! LoRa проигрывает даже на 2 hop'ах.
 ```
+
+### Правило выбора (с учётом MIN_RELAY_HOPS)
+
+```
+1. Все пользовательские сообщения: минимум MIN_RELAY_HOPS (1-3)
+2. Служебный трафик (HELLO, ping, ACK, DHT): может идти напрямую
+3. Выбор канала:
+   WiFi с N hop'ами vs LoRa с M hop'ами (где N,M ≥ MIN_RELAY_HOPS)
+   → Выбираем путь с минимальной estimated_latency
 
 ```go
 func EstimatedLatency(path []string, channelType string) time.Duration {
@@ -136,11 +154,27 @@ func EstimatedLatency(path []string, channelType string) time.Duration {
     return airTime * time.Duration(len(path)-1) / DutyCycleRate
 }
 
-// Выбираем путь с минимальной задержкой
-func BestPath(msg *Message, wifiPath, loraPath []string) ([]string, string) {
+// Выбираем путь с минимальной задержкой (с учётом MIN_RELAY_HOPS)
+func BestPath(msg *Message, wifiPath, loraPath []string, minHops int) ([]string, string) {
+    // Проверяем что пути удовлетворяют минимальному числу relay
+    wifiRelays := len(wifiPath) - 2
+    loraRelays := len(loraPath) - 2
+    
+    wifiValid := wifiRelays >= minHops
+    loraValid := loraRelays >= minHops
+    
+    if !wifiValid && !loraValid {
+        return nil, "" // нет подходящего пути
+    }
+    if !wifiValid {
+        return loraPath, "lora"
+    }
+    if !loraValid {
+        return wifiPath, "wifi"
+    }
+    
     wifiLat := EstimatedLatency(wifiPath, "wifi")
     loraLat := EstimatedLatency(loraPath, "lora")
-
     if wifiLat < loraLat {
         return wifiPath, "wifi"
     }

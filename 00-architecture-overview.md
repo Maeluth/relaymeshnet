@@ -75,3 +75,6 @@
 - `22-deployment-params.md` — практические параметры: частоты и закон РФ, EIRP, дальность LoRa, кросс-компиляция, ESP32+SX1276, PoE, антенны
 - `23-firmware-ecosystem.md` — экосистема прошивок: множественные разработчики, подпись Ed25519, каталог, обновление через mesh, BitTorrent-распространение
 - `24-qos-multipath.md` — QoS и multi-path: TCP/UDP-режимы, striping WiFi+LoRa, LoRa-бюджет, адаптивный выбор канала, сжатие
+- `25-node-lifecycle.md` — жизненный цикл узла: BOOTSTRAP → SANDBOX → RAMP-UP → ACTIVE → TRUSTED, vouch-механика
+- `26-identity-export.md` — экспорт/импорт identity: зашифрованный бэкап, cross-device sync, физический перенос
+- `27-cold-restart.md` — холодный рестарт сети: фазы восстановления, частичный/полный cold restart, новый старт
