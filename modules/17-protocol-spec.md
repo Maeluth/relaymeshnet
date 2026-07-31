@@ -1,4 +1,6 @@
-# Protocol Specification
+# Protocol Specification 🔴 Core
+
+> **Core.** Это и есть протокол. Wire format, onion-пакет, DHT RPC, PoR, PoH, X3DH, Confirm-N, state machine. Без этого спецификация сети неполна — нельзя написать совместимую ноду.
 
 Спецификация протокола RelayMeshNet (RMN) — мост между документацией и реализацией.
 Достаточно для написания совместимой ноды на любом языке.

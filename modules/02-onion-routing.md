@@ -1,4 +1,6 @@
-﻿# L2: Onion Routing
+﻿# L2: Onion Routing 🔴 Core
+
+> **Core.** Без onion-маршрутизации нет анонимности. Relay-логика, построение цепей, cover traffic — это протокол.
 
 ## Принцип
 

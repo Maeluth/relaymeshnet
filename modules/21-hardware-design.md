@@ -1,4 +1,6 @@
-﻿# Hardware & Product Design
+﻿# Hardware & Product Design 🟢 Optional
+
+> **Optional.** Дизайн железа — важно для продукта, но сеть работает на любом совместимом оборудовании. RelayStation, MeshNode, MeshStick — это рекомендации, не требования.
 
 ## От прототипа к продукту
 

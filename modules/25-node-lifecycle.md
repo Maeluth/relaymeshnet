@@ -1,4 +1,6 @@
-# Node Lifecycle
+# Node Lifecycle 🟡 Required
+
+> **Required.** Без понимания стадий (BOOTSTRAP → SANDBOX → RAMP-UP → ACTIVE → TRUSTED) невозможно ни разрабатывать, ни диагностировать. Это карта развития узла — не «документация», а спецификация.
 
 ## Путь узла: от включения до доверенного relay
 

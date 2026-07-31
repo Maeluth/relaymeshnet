@@ -1,4 +1,6 @@
-# L2: Proof of History (PoH) в Mesh
+# L2: Proof of History (PoH) 🟡 Required
+
+> **Required.** Без trustless времени reputation ненадёжна, PoR-квитанции можно подделать, cold restart невозможен. Технически сеть работает, но доверие — иллюзия.
 
 ## Что такое Proof of History
 

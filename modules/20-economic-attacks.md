@@ -1,4 +1,6 @@
-# Economic Attack Vectors & Defenses
+# Economic Attack Vectors 🟡 Required
+
+> **Required.** Без защиты от self-mining, Sybil-reset и cross-network migration экономика уязвима. PoH age gate и reputation ramp-up — не опции, а необходимость.
 
 ## 1. Sybil Reset Attack (сброс устройства для создания кредитов)
 

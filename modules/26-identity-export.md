@@ -1,4 +1,6 @@
-# Identity Export & Import
+# Identity Export & Import 🟡 Required
+
+> **Required.** Без механизма переноса identity пользователи теряют ключи, баланс и репутацию при смене устройства. Это не «удобство» — это необходимость для retention пользователей.
 
 ## Проблема
 

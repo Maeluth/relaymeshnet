@@ -1,4 +1,6 @@
-# Sovereignty, Clans & Trust Networks
+# Sovereignty, Clans & Trust Networks 🟡 Required
+
+> **Required.** Без социального слоя сеть — просто набор анонимных узлов. Кланы, суверенитеты, trust bootstrap — это не «фичи», а механизм масштабирования доверия. Без них cold restart занимает недели вместо часов.
 
 ## Принцип
 

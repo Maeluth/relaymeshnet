@@ -1,4 +1,6 @@
-# Transport QoS & Multi-Path
+# Transport QoS & Multi-Path 🟡 Required
+
+> **Required.** Без приоритезации трафика и multi-path сеть неэффективна: файлы забивают чат, LoRa используется когда WiFi быстрее. Это не «оптимизация» — без этого сеть деградирует под нагрузкой.
 
 ## Два режима доставки (TCP-like vs UDP-like)
 

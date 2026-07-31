@@ -1,4 +1,6 @@
-﻿# SDK & Development
+﻿# SDK & Development 🟢 Optional
+
+> **Optional.** SDK — удобная обёртка над Core API. Разработчик может писать напрямую через wire format. SDK ускоряет разработку, но не обязателен для работы сети.
 
 ## Назначение
 

@@ -1,4 +1,6 @@
-﻿# Protocol Versioning & Compatibility
+﻿# Protocol Versioning & Compatibility 🔴 Core
+
+> **Core.** Без версионирования и обратной совместимости обновления ломают сеть. Capability negotiation и три профиля — это протокольный уровень, не приложение.
 
 ## Принцип
 

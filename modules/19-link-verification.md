@@ -1,4 +1,6 @@
-# Link Verification & Node Classes
+# Link Verification & Node Classes 🟡 Required
+
+> **Required.** Без bidirectional проверки линков асимметричные соединения ломают маршрутизацию. Node classes нужны для выбора relay — без них battery-узлы используются как backbone.
 
 ## Проблема асимметричного линка
 
