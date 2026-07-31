@@ -21,6 +21,11 @@ func main() {
 	http.HandleFunc("/api/config", cors(handleConfig))
 	http.HandleFunc("/api/toggle-node", cors(handleToggleNode))
 	http.HandleFunc("/api/speed", cors(handleSpeed))
+	http.HandleFunc("/api/scenario/jam", cors(handleScenarioJam))
+	http.HandleFunc("/api/scenario/partition", cors(handleScenarioPartition))
+	http.HandleFunc("/api/scenario/sybil", cors(handleScenarioSybil))
+	http.HandleFunc("/api/scenario/load", cors(handleScenarioLoad))
+	http.HandleFunc("/api/scenario/daynight", cors(handleScenarioDayNight))
 	http.Handle("/", http.FileServer(http.Dir("ui")))
 
 	var lastTickCount int
@@ -152,6 +157,60 @@ func handleSpeed(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]int{"speed": world.Speed})
+}
+
+// === Scenario Handlers ===
+
+func handleScenarioJam(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" { return }
+	var req struct {
+		Cells [][2]int `json:"cells"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil { return }
+	world.SetJamming(req.Cells)
+	w.WriteHeader(200)
+}
+
+func handleScenarioPartition(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" { return }
+	var req struct {
+		X1, Y1, X2, Y2 int  `json:"x1,y1,x2,y2"`
+		Blocked         bool `json:"blocked"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil { return }
+	world.Partition(req.X1, req.Y1, req.X2, req.Y2, req.Blocked)
+	w.WriteHeader(200)
+}
+
+func handleScenarioSybil(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" { return }
+	var req struct {
+		Count int `json:"count"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil { return }
+	world.SpawnSybil(req.Count)
+	w.WriteHeader(200)
+}
+
+func handleScenarioLoad(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" { return }
+	var req struct {
+		NodeCount int `json:"nodeCount"`
+		FileSize  int `json:"fileSize"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil { return }
+	world.LoadTest(req.NodeCount, req.FileSize)
+	w.WriteHeader(200)
+}
+
+func handleScenarioDayNight(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" { return }
+	var req struct {
+		OnlineProb float64 `json:"onlineProb"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil { return }
+	world.SetDayNight(req.OnlineProb)
+	w.WriteHeader(200)
 }
 
 type UIState struct {

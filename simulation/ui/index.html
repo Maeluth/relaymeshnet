@@ -45,6 +45,22 @@ button:hover{background:#2ea043}
   <div class="ctrl"><label>Затухание перекрытия: <span class="val" id="faVal">15dB</span></label><input type="range" id="floorAtten" min="0" max="40" value="15"></div>
   <div style="margin-top:6px"><button onclick="resetSim()">Сброс мира</button></div>
 
+  <h2>Сценарии</h2>
+  <div class="ctrl"><label>Глушение (X,Y через запятую):</label><input id="jamCells" placeholder="2,3; 4,1; 7,2" style="width:100%;font-size:10px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;padding:2px 4px"></div>
+  <button onclick="scenarioJam()">Включить глушение</button> <button onclick="scenarioJamClear()">Очистить</button>
+
+  <div class="ctrl" style="margin-top:4px"><label>Partition: X1,Y1 X2,Y2</label><input id="partRegion" placeholder="0,0 10,2" style="width:100%;font-size:10px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;padding:2px 4px"></div>
+  <button onclick="scenarioPartition(true)">Отрезать</button> <button onclick="scenarioPartition(false)">Восстановить</button>
+
+  <div class="ctrl" style="margin-top:4px"><label>Sybil: кол-во узлов</label><input id="sybilCount" value="20" style="width:100%;font-size:10px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;padding:2px 4px"></div>
+  <button onclick="scenarioSybil()">Запустить Sybil</button>
+
+  <div class="ctrl" style="margin-top:4px"><label>Load test: узлов / размер файла KB</label><input id="loadParams" placeholder="50,100" style="width:100%;font-size:10px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;padding:2px 4px"></div>
+  <button onclick="scenarioLoad()">Запустить нагрузку</button>
+
+  <div class="ctrl" style="margin-top:4px"><label>Day/Night: % онлайн</label><input id="dayNightProb" value="30" style="width:100%;font-size:10px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;padding:2px 4px"></div>
+  <button onclick="scenarioDayNight()">Ночь (30%)</button> <button onclick="scenarioDayNight(95)">День (95%)</button>
+
   <canvas id="graph" width="320" height="90" style="margin-top:6px;background:#0d1117;border:1px solid #21262d;border-radius:4px"></canvas>
   <canvas id="graph2" width="320" height="90" style="margin-top:4px;background:#0d1117;border:1px solid #21262d;border-radius:4px"></canvas>
   <canvas id="graph3" width="320" height="75" style="margin-top:4px;background:#0d1117;border:1px solid #21262d;border-radius:4px"></canvas>

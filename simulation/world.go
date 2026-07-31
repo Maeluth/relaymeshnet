@@ -454,6 +454,115 @@ func (w *World) TotalSupply() float64 {
 	return sum
 }
 
+// === Scenario API ===
+
+// SetJamming устанавливает зоны глушения
+func (w *World) SetJamming(cells [][2]int) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.Config.JammingEnabled = len(cells) > 0
+	w.Config.JammingCells = cells
+}
+
+// Partition блокирует связи между регионами
+func (w *World) Partition(x1, y1, x2, y2 int, blocked bool) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	// Блокируем соединения между двумя прямоугольными регионами
+	for y := y1; y <= y2; y++ {
+		for x := x1; x <= x2; x++ {
+			n := w.NodeAt(x, y)
+			if n != nil {
+				if blocked {
+					n.Status = StatusOffline
+					n.OfflineSince = w.Tick
+				} else {
+					n.Status = StatusOnline
+					n.OfflineSince = -1
+				}
+			}
+		}
+	}
+}
+
+// SpawnSybil создаёт N Sybil-узлов со случайными позициями
+func (w *World) SpawnSybil(count int) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	for i := 0; i < count; i++ {
+		x := rand.Intn(w.Config.GridWidth)
+		y := rand.Intn(w.Config.GridHeight)
+		n := NewNode(x, y, &w.Config)
+		n.Reputation = 0
+		n.Balance = 0
+		n.Status = StatusOnline
+		n.Profile = ProfileChatter // Sybil-узлы ведут себя как chatter
+		w.Nodes[y][x] = n // заменяем существующий узел
+	}
+}
+
+// LoadTest запускает массовую отправку файлов
+func (w *World) LoadTest(nodeCount, fileSize int) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	all := w.AllNodes()
+	rand.Shuffle(len(all), func(i, j int) { all[i], all[j] = all[j], all[i] })
+	for i := 0; i < nodeCount && i < len(all); i++ {
+		from := all[i]
+		if from.Status != StatusOnline { continue }
+		// Отправляем файл случайному соседу
+		online := w.OnlineNodes()
+		if len(online) < 2 { break }
+		for attempt := 0; attempt < 10; attempt++ {
+			to := online[rand.Intn(len(online))]
+			if to.ID != from.ID && w.HasConnection(from, to) {
+				// Форсируем отправку файла
+				from.LastSendTick = w.Tick - 1000 // сбрасываем rate limit
+				w.SendFileInternal(from, to, fileSize)
+				break
+			}
+		}
+	}
+}
+
+// SendFileInternal форсированная отправка файла (для load test)
+func (w *World) SendFileInternal(from, to *Node, fileSize int) {
+	online := w.OnlineNodes()
+	m := w.sendMsg(from, to, MsgFile, fileSize, online, w.AllNodes())
+	if m != nil {
+		atomic.AddInt64(&w.TotalSent, 1)
+		from.SentCount++
+		from.LastSendTick = w.Tick
+		from.FileSent++
+		w.msgMu.Lock()
+		w.ActiveMessages = append(w.ActiveMessages, *m)
+		w.msgMu.Unlock()
+	}
+}
+
+// SetDayNight устанавливает вероятность онлайна для day/night цикла
+func (w *World) SetDayNight(onlineProb float64) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	for y := 0; y < w.Config.GridHeight; y++ {
+		for x := 0; x < w.Config.GridWidth; x++ {
+			n := w.Nodes[y][x]
+			if n.Profile == ProfileUnstable { continue }
+			if rand.Float64() > onlineProb {
+				if n.Status == StatusOnline {
+					n.Status = StatusOffline
+					n.OfflineSince = w.Tick
+				}
+			} else {
+				if n.Status == StatusOffline {
+					n.Status = StatusOnline
+					n.OfflineSince = -1
+				}
+			}
+		}
+	}
+}
+
 // SendMulticast отправляет групповое сообщение через multicast-дерево
 func (w *World) SendMulticast(from *Node, recipients []*Node, msgBytes int, online []*Node) []*ActiveMsg {
 	if from.Status != StatusOnline || len(recipients) == 0 { return nil }

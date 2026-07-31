@@ -337,6 +337,36 @@ async function toggleNode(x,y){
   await fetch('/api/toggle-node',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({x,y})});
 }
 
+// === Scenario Functions ===
+async function scenarioJam(){
+  const raw=document.getElementById('jamCells').value;
+  const cells=raw.split(';').map(s=>s.trim()).filter(s=>s).map(s=>{const p=s.split(',');return[parseInt(p[0]),parseInt(p[1])]});
+  await fetch('/api/scenario/jam',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cells})});
+}
+async function scenarioJamClear(){
+  document.getElementById('jamCells').value='';
+  await fetch('/api/scenario/jam',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cells:[]})});
+}
+async function scenarioPartition(blocked){
+  const raw=document.getElementById('partRegion').value;
+  const parts=raw.split(' ').map(s=>s.split(',').map(Number));
+  if(parts.length<2)return;
+  await fetch('/api/scenario/partition',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({x1:parts[0][0],y1:parts[0][1],x2:parts[1][0],y2:parts[1][1],blocked})});
+}
+async function scenarioSybil(){
+  const count=parseInt(document.getElementById('sybilCount').value)||20;
+  await fetch('/api/scenario/sybil',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({count})});
+}
+async function scenarioLoad(){
+  const raw=document.getElementById('loadParams').value;
+  const parts=raw.split(',').map(Number);
+  await fetch('/api/scenario/load',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nodeCount:parts[0]||50,fileSize:(parts[1]||100)*1024})});
+}
+async function scenarioDayNight(prob){
+  const p=prob||parseInt(document.getElementById('dayNightProb').value)||30;
+  await fetch('/api/scenario/daynight',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({onlineProb:p})});
+}
+
 function renderGraphs(){
   // Graph 1: балансы (зелёные/жёлтые/красные)
   if(history.length > 1){
