@@ -102,7 +102,7 @@ go run .
 
 ## Status
 
-**Pre-MVP.** Architecture and simulation are complete. Physical prototype targeted for early 2027.
+**Pre-MVP.** Architecture (29 modules) and simulation are complete. Physical hardware testing targeted to begin early 2027. Development is ongoing — there is no planned end date. The project evolves as long as there are contributors and users.
 
 ## Author
 
