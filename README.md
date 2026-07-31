@@ -2,7 +2,7 @@
 
 **Decentralized mesh network with built-in tokenomics — designed to work without internet.**
 
-[![Architecture](https://img.shields.io/badge/modules-24-blue)]()
+[![Architecture](https://img.shields.io/badge/modules-25-blue)]()
 [![Simulation](https://img.shields.io/badge/simulation-Go-green)]()
 [![Stage](https://img.shields.io/badge/stage-design%20%2B%20simulation-orange)]()
 
@@ -93,6 +93,8 @@ go run .
 | 20 | Economic attacks (Sybil reset, self-mining, cross-network migration) |
 | 21 | Hardware design (3 device models, modularity, roadmap) |
 | 22 | Deployment params (frequencies, EIRP, LoRa range, cross-compilation) |
+| 23 | Firmware ecosystem (multi-developer, Ed25519 signing, BitTorrent distribution) |
+| 24 | QoS & Multi-path (TCP/UDP modes, WiFi+LoRa striping, LoRa budget, compression) |
 
 ## Status
 
