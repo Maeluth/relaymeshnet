@@ -29,3 +29,21 @@ simulation/build/
 simulation/dist/
 simulation/__pycache__/
 DEVNOTES.md
+
+# Python
+*.pyc
+__pycache__/
+*.egg-info/
+
+# Node
+node_modules/
+
+# Coverage
+*.cover
+coverage/
+coverage.out
+
+# Temp
+*.tmp
+*.swp
+*~
