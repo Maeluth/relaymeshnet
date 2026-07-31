@@ -73,3 +73,4 @@
 - `20-economic-attacks.md` — экономические атаки: Sybil reset, self-mining, cross-network migration, защита через PoH age gate и ramp-up
 - `21-hardware-design.md` — продуктовый дизайн: три модели устройств (RelayStation, MeshNode, MeshStick), модульность, roadmap
 - `22-deployment-params.md` — практические параметры: частоты и закон РФ, EIRP, дальность LoRa, кросс-компиляция, ESP32+SX1276, PoE, антенны
+- `23-firmware-ecosystem.md` — экосистема прошивок: множественные разработчики, подпись Ed25519, каталог, обновление через mesh, BitTorrent-распространение
