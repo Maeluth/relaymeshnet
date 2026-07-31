@@ -78,3 +78,4 @@
 - `25-node-lifecycle.md` — жизненный цикл узла: BOOTSTRAP → SANDBOX → RAMP-UP → ACTIVE → TRUSTED, vouch-механика
 - `26-identity-export.md` — экспорт/импорт identity: зашифрованный бэкап, cross-device sync, физический перенос
 - `27-cold-restart.md` — холодный рестарт сети: фазы восстановления, частичный/полный cold restart, новый старт
+- `28-sovereignty-clans.md` — суверенитеты и кланы: социальный слой доверия, белые/серые/чёрные зоны, бан-листы, добровольная федерация
