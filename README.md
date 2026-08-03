@@ -2,7 +2,7 @@
 
 **Decentralized mesh network with built-in tokenomics — designed to work without internet.**
 
-[![Architecture](https://img.shields.io/badge/modules-32-blue)]()
+[![Architecture](https://img.shields.io/badge/modules-35-blue)]()
 [![Simulation](https://img.shields.io/badge/simulation-Go-green)]()
 [![Stage](https://img.shields.io/badge/stage-design%20%2B%20simulation-orange)]()
 
@@ -102,6 +102,9 @@ go run .
 | 29 | HAL spec (hardware auto-detection, ESP32 serial protocol, adaptation) |
 | 30 | Device profile (auto role detection, identity generation, runtime config) |
 | 31 | OTA updates (signed firmware, BitTorrent download, rollback, partial updates) |
+| 32 | Data migration (DB schema migration, config conversion, backward compatibility) |
+| 33 | Monitoring & diagnostics (system/relay/economy metrics, alerts, message tracing) |
+| 34 | LoRa driver (ESP32 ↔ Router serial protocol v2, Go driver, C firmware) |
 
 ## Status
 

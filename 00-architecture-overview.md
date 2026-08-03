@@ -84,3 +84,6 @@
 - `29-hal-spec.md` 🟡 — Hardware Abstraction Layer: автоопределение CPU/RAM/радио, serial-протокол ESP32, адаптация конфигурации под железо
 - `30-device-profile.md` 🟡 — Device Profile: автоопределение роли (relay/node/bridge), генерация identity, сохранение конфигурации
 - `31-ota-updates.md` 🟡 — OTA Updates: безопасное обновление через mesh, подпись Ed25519, BitTorrent-загрузка, откат при ошибке, частичное обновление
+- `32-data-migration.md` 🟡 — Data Migration: миграция схемы БД между версиями, конвертация конфигурации, DHT-кэша, обратная совместимость при чтении
+- `33-monitoring.md` 🟡 — Monitoring & Diagnostics: системные/relay/экономические метрики, health check соседей, алерты, трассировка сообщений, админ-панель
+- `34-lora-driver.md` 🔴 — LoRa Driver (ESP32 ↔ Router): serial-протокол v2, Go-драйвер на роутере, прошивка ESP32 на C/Arduino, CRC, фрагментация, LBT
