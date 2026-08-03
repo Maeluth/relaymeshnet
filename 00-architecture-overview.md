@@ -91,3 +91,4 @@
 - `36-poh-sync.md` 🟡 — PoH Sync: cross-reference между узлами, causal ordering, коррекция временного смещения, применение в DHT и репутации
 - `37-adaptive-onion.md` 🟡 — Adaptive Onion: выбор уровня (Full/Medium/Light/Lite) по RAM/каналу/CPU/размеру, onion-lite для LoRa SF12, мониторинг анонимности
 - `38-intermesh-federation.md` 🟡 — Inter-Mesh Federation: соединение mesh-сетей через интернет (Tor/VPN), bridge-туннели, федеративный DHT, discovery, топология
+- `39-network-evolution.md` 🟢 — Network Evolution: 5 стадий роста (0-1000+ узлов), экономические роли, сервисы, проблемы на каждом этапе

@@ -2,7 +2,7 @@
 
 **Decentralized mesh network with built-in tokenomics — designed to work without internet.**
 
-[![Architecture](https://img.shields.io/badge/modules-39-blue)]()
+[![Architecture](https://img.shields.io/badge/modules-40-blue)]()
 [![Simulation](https://img.shields.io/badge/simulation-Go-green)]()
 [![Stage](https://img.shields.io/badge/stage-design%20%2B%20simulation-orange)]()
 
@@ -109,6 +109,7 @@ go run .
 | 36 | PoH sync (cross-reference, causal ordering, time offset correction) |
 | 37 | Adaptive onion (level selection by RAM/channel/CPU/size, onion-lite) |
 | 38 | Inter-mesh federation (Internet bridge tunnels, Tor/VPN, federated DHT, discovery) |
+| 39 | Network evolution (5 growth stages, economic roles, services, problems at each stage) |
 
 ## Status
 
