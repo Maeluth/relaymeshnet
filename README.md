@@ -2,7 +2,7 @@
 
 **Decentralized mesh network with built-in tokenomics — designed to work without internet.**
 
-[![Architecture](https://img.shields.io/badge/modules-35-blue)]()
+[![Architecture](https://img.shields.io/badge/modules-38-blue)]()
 [![Simulation](https://img.shields.io/badge/simulation-Go-green)]()
 [![Stage](https://img.shields.io/badge/stage-design%20%2B%20simulation-orange)]()
 
@@ -105,6 +105,9 @@ go run .
 | 32 | Data migration (DB schema migration, config conversion, backward compatibility) |
 | 33 | Monitoring & diagnostics (system/relay/economy metrics, alerts, message tracing) |
 | 34 | LoRa driver (ESP32 ↔ Router serial protocol v2, Go driver, C firmware) |
+| 35 | Gossip-DHT (alternative to Kademlia, bloom filters, delta sync) |
+| 36 | PoH sync (cross-reference, causal ordering, time offset correction) |
+| 37 | Adaptive onion (level selection by RAM/channel/CPU/size, onion-lite) |
 
 ## Status
 

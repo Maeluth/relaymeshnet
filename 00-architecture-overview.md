@@ -87,3 +87,6 @@
 - `32-data-migration.md` 🟡 — Data Migration: миграция схемы БД между версиями, конвертация конфигурации, DHT-кэша, обратная совместимость при чтении
 - `33-monitoring.md` 🟡 — Monitoring & Diagnostics: системные/relay/экономические метрики, health check соседей, алерты, трассировка сообщений, админ-панель
 - `34-lora-driver.md` 🔴 — LoRa Driver (ESP32 ↔ Router): serial-протокол v2, Go-драйвер на роутере, прошивка ESP32 на C/Arduino, CRC, фрагментация, LBT
+- `35-gossip-dht.md` 🟡 — Gossip-DHT: альтернатива Kademlia для unreliable mesh, bloom-фильтры, delta-синхронизация, сравнение и выбор режима
+- `36-poh-sync.md` 🟡 — PoH Sync: cross-reference между узлами, causal ordering, коррекция временного смещения, применение в DHT и репутации
+- `37-adaptive-onion.md` 🟡 — Adaptive Onion: выбор уровня (Full/Medium/Light/Lite) по RAM/каналу/CPU/размеру, onion-lite для LoRa SF12, мониторинг анонимности
