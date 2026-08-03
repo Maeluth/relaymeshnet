@@ -132,6 +132,44 @@ func DetectRadios() []RadioInfo {
     return radios
 }
 
+// Периферия: USB-устройства и LAN-подключения
+func detectPeripherals() PeripheralInfo {
+    p := PeripheralInfo{}
+    
+    // USB-флешки
+    mounts, _ := exec.Command("mount").Output()
+    for _, line := range strings.Split(string(mounts), "\n") {
+        if strings.Contains(line, "/dev/sd") && !strings.Contains(line, "/boot") {
+            p.USBStorage = append(p.USBStorage, parseMount(line))
+        }
+    }
+    
+    // LAN-подключения
+    ifaces, _ := net.Interfaces()
+    for _, iface := range ifaces {
+        if strings.HasPrefix(iface.Name, "eth") || strings.HasPrefix(iface.Name, "lan") {
+            if (iface.Flags & net.FlagUp) != 0 {
+                p.LANConnections = append(p.LANConnections, iface.Name)
+            }
+        }
+    }
+    
+    return p
+}
+
+type PeripheralInfo struct {
+    USBStorage     []MountPoint  // флешки
+    LANConnections []string       // активные Ethernet-порты
+}
+
+type MountPoint struct {
+    Device     string  // "/dev/sda1"
+    MountPoint string  // "/mnt/usb"
+    Size       int     // MB
+    Available  int     // MB
+    ReadOnly   bool
+}
+
 func detectLoRa(device string) RadioInfo {
     // Отправляем AT-команду на устройство
     // ESP32 отвечает: "LORA: chip=SX1276, freq=868, sf=7-12"
