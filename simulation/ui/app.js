@@ -16,10 +16,10 @@ const sliderKeys = ['speed','gridWidth','gridHeight','wifiRange','loraRange','ce
 
 const sliders = {
   speed:     {el:document.getElementById('speed'),     val:document.getElementById('speedVal'),    fmt:v=>v+'x',   def:'10'},
-  gridWidth: {el:document.getElementById('gridWidth'), val:document.getElementById('gwVal'),      fmt:v=>v,       def:'50'},
+  gridWidth: {el:document.getElementById('gridWidth'), val:document.getElementById('gwVal'),      fmt:v=>v,       def:'40'},
   gridHeight:{el:document.getElementById('gridHeight'),val:document.getElementById('ghVal'),      fmt:v=>v,       def:'10'},
   wifiRange: {el:document.getElementById('wifiRange'), val:document.getElementById('wifiVal'),    fmt:v=>v+'м',   def:'30'},
-  loraRange: {el:document.getElementById('loraRange'), val:document.getElementById('loraVal'),    fmt:v=>v+'м',   def:'5000'},
+  loraRange: {el:document.getElementById('loraRange'), val:document.getElementById('loraVal'),    fmt:v=>v+'м',   def:'75'},
   cellWidth: {el:document.getElementById('cellWidth'), val:document.getElementById('cwVal'),     fmt:v=>v+'м',   def:'20'},
   cellHeight:{el:document.getElementById('cellHeight'),val:document.getElementById('chVal'),     fmt:v=>v+'м',   def:'4'},
   wallAtten: {el:document.getElementById('wallAtten'), val:document.getElementById('waVal'),     fmt:v=>v+'dB',  def:'10'},

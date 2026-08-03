@@ -38,7 +38,7 @@ type Config struct {
 
 func DefaultConfig() Config {
 	return Config{
-		GridWidth:   50,
+		GridWidth:   40,
 		GridHeight:  10,
 		CellWidth:   20.0,
 		CellHeight:  4.0,
@@ -49,7 +49,7 @@ func DefaultConfig() Config {
 		JammingCells:   [][2]int{},
 
 		WiFiRange:   30.0,
-		LoRaRange:   200.0,
+		LoRaRange:   75.0,
 		WiFiTXPower: 20.0,
 		LoRaTXPower: 14.0,
 		NoiseFloor:  -95.0,
