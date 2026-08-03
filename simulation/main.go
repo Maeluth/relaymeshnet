@@ -279,8 +279,11 @@ type UIStats struct {
 	YellowCount    int     `json:"yellowCount"`
 	RedCount       int     `json:"redCount"`
 	TotalSupply    float64 `json:"totalSupply"`
-	TotalTransfers int     `json:"totalTransfers"`
-	TPS            int     `json:"tps"`
+	TotalTransfers  int     `json:"totalTransfers"`
+	TPS             int     `json:"tps"`
+	NetEmission     float64 `json:"netEmission"`
+	TotalEmission   float64 `json:"totalEmission"`
+	TotalBurn       float64 `json:"totalBurn"`
 }
 
 func worldToState(w *World) UIState {
@@ -315,6 +318,9 @@ func worldToState(w *World) UIState {
 			TotalSupply:    w.TotalSupply(),
 			TotalTransfers: int(atomic.LoadInt64(&w.TotalTransfers)),
 			TPS:            w.TPS,
+			TotalEmission:  float64(atomic.LoadInt64(&w.TotalEmission)) / 100.0,
+			TotalBurn:      float64(atomic.LoadInt64(&w.TotalBurn)) / 100.0,
+			NetEmission:    (float64(atomic.LoadInt64(&w.TotalEmission)) - float64(atomic.LoadInt64(&w.TotalBurn))) / 100.0,
 		},
 	}
 
@@ -383,6 +389,9 @@ func handleExportCSV(w http.ResponseWriter, r *http.Request) {
 	csv += fmt.Sprintf("giniReputation,%.4f\n", s.GiniReputation)
 	csv += fmt.Sprintf("jainFairness,%.4f\n", s.JainFairness)
 	csv += fmt.Sprintf("totalSupply,%.0f\n", s.TotalSupply)
+	csv += fmt.Sprintf("netEmission,%.1f\n", s.NetEmission)
+	csv += fmt.Sprintf("totalEmission,%.1f\n", s.TotalEmission)
+	csv += fmt.Sprintf("totalBurn,%.1f\n", s.TotalBurn)
 	csv += fmt.Sprintf("totalTransfers,%d\n", s.TotalTransfers)
 	csv += fmt.Sprintf("onlineNodes,%d\n", s.OnlineNodes)
 	csv += fmt.Sprintf("greenNodes,%d\n", s.GreenCount)
@@ -419,8 +428,9 @@ type SweepPoint struct {
 	GiniBalance    float64 `json:"giniBalance"`
 	GiniReputation float64 `json:"giniReputation"`
 	JainFairness   float64 `json:"jainFairness"`
-	TotalSupply    float64 `json:"totalSupply"`
-	TotalTransfers int     `json:"totalTransfers"`
+	TotalSupply     float64 `json:"totalSupply"`
+	NetEmission     float64 `json:"netEmission"`
+	TotalTransfers  int     `json:"totalTransfers"`
 	GreenCount     int     `json:"greenCount"`
 	RedCount       int     `json:"redCount"`
 }
@@ -450,7 +460,7 @@ func runSweep(req SweepRequest) SweepResult {
 
 	for i := 0; i < req.Steps; i++ {
 		paramVal := req.RangeMin + float64(i)*step
-		var sentSum, recvSum, supplySum, transfersSum int64
+		var sentSum, recvSum, supplySum, transfersSum, emissionSum, burnSum int64
 		var collSum, giniBSum, giniRSum, jainSum float64
 		var greenSum, redSum int64
 
@@ -492,6 +502,8 @@ func runSweep(req SweepRequest) SweepResult {
 			recvSum += atomic.LoadInt64(&w2.TotalReceived)
 			supplySum += int64(w2.TotalSupply())
 			transfersSum += atomic.LoadInt64(&w2.TotalTransfers)
+			emissionSum += atomic.LoadInt64(&w2.TotalEmission)
+			burnSum += atomic.LoadInt64(&w2.TotalBurn)
 			collSum += w2.CollisionRate()
 			giniBSum += w2.GiniBalance()
 			giniRSum += w2.GiniReputation()
@@ -510,6 +522,7 @@ func runSweep(req SweepRequest) SweepResult {
 			GiniReputation: giniRSum / n,
 			JainFairness:   jainSum / n,
 			TotalSupply:    float64(supplySum) / n,
+			NetEmission:    (float64(emissionSum) - float64(burnSum)) / n / 100.0,
 			TotalTransfers: int(float64(transfersSum) / n),
 			GreenCount:     int(float64(greenSum) / n),
 			RedCount:       int(float64(redSum) / n),

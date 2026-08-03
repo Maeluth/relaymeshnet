@@ -319,6 +319,8 @@ function updateStats() {
     `<div class="stat"><span class="l">RELAY в обороте</span><span class="v y">${s.totalRelay.toFixed(0)}</span></div>`+
     `<div class="stat"><span class="l">В пути</span><span class="v" style="color:#f778ba">${s.activeMsgs}</span></div>`+
     `<div class="stat"><span class="l">Supply</span><span class="v y">${(s.totalSupply||0).toFixed(0)}</span></div>`+
+    `<div class="stat"><span class="l">Net эмиссия</span><span class="v" style="color:${(s.netEmission||0)>0?'#3fb950':'#f85149'}">${(s.netEmission||0).toFixed(1)}</span></div>`+
+    `<div class="stat"><span class="l">Emission / Burn</span><span class="v" style="font-size:9px">+${(s.totalEmission||0).toFixed(1)} / -${(s.totalBurn||0).toFixed(1)}</span></div>`+
     `<div class="stat"><span class="l">Трансферов</span><span class="v" style="color:#58a6ff">${(s.totalTransfers||0)}</span></div>`+
     `<div class="stat"><span class="l">Gini баланса</span><span class="v" style="color:${(s.giniBalance||0)<0.5?'#3fb950':'#f85149'}">${(s.giniBalance||0).toFixed(3)}</span></div>`+
     `<div class="stat"><span class="l">Gini репутации</span><span class="v" style="color:${(s.giniReputation||0)<0.5?'#3fb950':'#f85149'}">${(s.giniReputation||0).toFixed(3)}</span></div>`+
@@ -477,9 +479,10 @@ function renderGraphs(){
   }
 
   if(supplyHistory.length > 1){
-    const maxSupply = Math.max(1, ...supplyHistory.map(h=>h.supply));
+    const maxSupply = Math.max(1, ...supplyHistory.map(h=>Math.max(h.supply, h.netEmission||0)));
     drawGraph('graph4', [
       {data: supplyHistory.map(h=>h.supply), color:'#d29922', label:'total supply'},
+      {data: supplyHistory.map(h=>h.netEmission||0), color:'#58a6ff', label:'net emission'},
     ], maxSupply);
     // Добавляем заголовок
     const g4 = document.getElementById('graph4');
@@ -562,7 +565,7 @@ async function poll(){
         prevStats = {tick:state.tick, totalSent:s.totalSent, totalReceived:s.totalReceived, totalFailed:s.totalFailed, totalRelayed:s.totalRelayed, totalRelay:s.totalRelay||0};
         flowHistory.push({sentPM, recvPM, lostPM, relayPM, creditPM, tps:s.tps, transit:s.activeMsgs, online:s.onlineNodes, success:parseFloat((s.totalReceived/(s.totalReceived+s.totalFailed+0.001)*100).toFixed(1))});
         if(flowHistory.length > 200) flowHistory.shift();
-        supplyHistory.push({tick:state.tick, supply:s.totalSupply||0});
+        supplyHistory.push({tick:state.tick, supply:s.totalSupply||0, netEmission:s.netEmission||0});
         if(supplyHistory.length > 200) supplyHistory.shift();
         giniHistory.push({tick:state.tick, giniB:s.giniBalance||0, giniR:s.giniReputation||0, jainF:s.jainFairness||1, collR:s.collisionRate||0});
         if(giniHistory.length > 200) giniHistory.shift();

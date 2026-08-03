@@ -16,13 +16,15 @@ type World struct {
 	Speed   int
 	TPS     int
 
-	TotalSent     int64
-	TotalReceived int64
-	TotalFailed   int64
-	TotalRelayed  int64
-	TotalRELAY    int64
+	TotalSent      int64
+	TotalReceived  int64
+	TotalFailed    int64
+	TotalRelayed   int64
+	TotalRELAY     int64
 	TotalTransfers int64
 	TotalCollisions int64
+	TotalEmission  int64
+	TotalBurn      int64
 
 	ActiveMessages  []ActiveMsg
 	ActiveTransmissions []Transmission
@@ -372,7 +374,10 @@ func (w *World) sendMsg(from, to *Node, mt MsgType, mb int, online, all []*Node)
 		if cost > 0 {
 			burn := cost * from.cfg.BurnRate
 			from.Balance -= cost
-			atomic.AddInt64(&w.TotalRELAY, int64((cost-burn)*100))
+			// relay-узлы получат cost - burn (через AddRelayWork)
+			relayVolume := cost - burn
+			atomic.AddInt64(&w.TotalRELAY, int64(relayVolume*100))
+			atomic.AddInt64(&w.TotalBurn, int64(burn*100))
 		}
 	}
 	if cn > 0 {
@@ -380,6 +385,7 @@ func (w *World) sendMsg(from, to *Node, mt MsgType, mb int, online, all []*Node)
 		if rand.Float64() < 0.8 {
 			emission := float64(cn*from.cfg.RelayChunkSize) / 1024.0 * from.cfg.EmissionRate
 			from.Balance += emission
+			atomic.AddInt64(&w.TotalEmission, int64(emission*100))
 		}
 		from.EWMAWork += float64(cn*from.cfg.RelayChunkSize)
 		atomic.AddInt64(&w.TotalRelayed, int64(cn))
@@ -390,32 +396,25 @@ func (w *World) sendMsg(from, to *Node, mt MsgType, mb int, online, all []*Node)
 	mts := "text"
 	if mt == MsgFile { mts = "file" }
 	
-	// Track transmissions for collision detection (LoRa only)
+	// Track single transmission per sender for collision detection (LoRa only)
 	dist := from.DistanceTo(to, w.Config.CellWidth, w.Config.CellHeight)
 	walls, floors := from.WallsBetween(to)
+	msgID := from.PeerID()[:8] + "-" + to.PeerID()[:8]
 	if dist > w.Config.WiFiRange || !w.HasConnection(from, to) || dist > 50 {
-		// LoRa transmission → track for collisions
 		_, air, _ := from.FragmentsFor(mb, NewLoRaRadio(), dist, walls, floors, w.Config.WallAtten, w.Config.FloorAtten, w.Config.NoiseFloor)
 		airTicks := int(air / SecondsPerTick)
 		if airTicks < 1 { airTicks = 1 }
-		for i := 0; i < len(path)-1; i++ {
-			hopNode := from
-			if i > 0 {
-				for _, nd := range all {
-					if nd.PeerID() == path[i] { hopNode = nd; break }
-				}
-			}
-			w.addTransmission(from.PeerID()[:8]+"-"+to.PeerID()[:8]+"-hop"+string(rune('0'+i)), hopNode, airTicks)
-		}
+		if airTicks > 20 { airTicks = 20 }
+		w.addTransmission(msgID, from, airTicks)
 	}
-	
+
 	for i := 1; i < len(path)-1; i++ {
 		for _, nd := range all {
 			if nd.PeerID() == path[i] { nd.AddRelayWork(float64(mb)); break }
 		}
 	}
 	return &ActiveMsg{
-		ID:        from.PeerID()[:8] + "-" + to.PeerID()[:8],
+		ID:        msgID,
 		From:      from.PeerID(),
 		To:        to.PeerID(),
 		Path:      path,
