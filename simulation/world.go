@@ -2,6 +2,7 @@ package main
 
 import (
 	"math/rand"
+	"sort"
 	"sync"
 	"sync/atomic"
 )
@@ -21,9 +22,11 @@ type World struct {
 	TotalRelayed  int64
 	TotalRELAY    int64
 	TotalTransfers int64
+	TotalCollisions int64
 
-	ActiveMessages []ActiveMsg
-	Events         []Event
+	ActiveMessages  []ActiveMsg
+	ActiveTransmissions []Transmission
+	Events          []Event
 }
 
 type ActiveMsg struct {
@@ -36,6 +39,14 @@ type ActiveMsg struct {
 	Size      int
 	MsgType   string
 	ACKs      []bool // hop-by-hop ACK: true если hop подтвердил получение
+	Collided  bool   // true если сообщение потеряно из-за коллизии
+}
+
+type Transmission struct {
+	MsgID     string
+	FromNode  *Node
+	StartTick int
+	EndTick   int
 }
 
 type Event struct {
@@ -204,6 +215,9 @@ func (w *World) RunSteps(n int) {
 		w.Tick++
 		t := w.Tick
 
+		// Коллизии: проверяем пересекающиеся передачи
+		w.checkCollisions()
+
 		// Статусы и репутация
 		for _, nd := range all {
 			if t%300 == 0 { nd.UpdateReputation() }
@@ -220,11 +234,17 @@ func (w *World) RunSteps(n int) {
 			}
 		}
 
-		// Доставка с hop-by-hop ACK
+		// Доставка с hop-by-hop ACK и проверкой коллизий
 		w.msgMu.Lock()
 		rem := w.ActiveMessages[:0]
 		for i := range w.ActiveMessages {
 			msg := &w.ActiveMessages[i]
+			
+			// Сообщение потеряно из-за коллизии
+			if msg.Collided {
+				continue // удаляем из active, не доставляем
+			}
+			
 			msg.Remaining--
 			
 			// Hop-by-hop ACK: отмечаем пройденные hop'и
@@ -369,6 +389,26 @@ func (w *World) sendMsg(from, to *Node, mt MsgType, mb int, online, all []*Node)
 	if ticks > 3000 { ticks = 3000 }
 	mts := "text"
 	if mt == MsgFile { mts = "file" }
+	
+	// Track transmissions for collision detection (LoRa only)
+	dist := from.DistanceTo(to, w.Config.CellWidth, w.Config.CellHeight)
+	walls, floors := from.WallsBetween(to)
+	if dist > w.Config.WiFiRange || !w.HasConnection(from, to) || dist > 50 {
+		// LoRa transmission → track for collisions
+		_, air, _ := from.FragmentsFor(mb, NewLoRaRadio(), dist, walls, floors, w.Config.WallAtten, w.Config.FloorAtten, w.Config.NoiseFloor)
+		airTicks := int(air / SecondsPerTick)
+		if airTicks < 1 { airTicks = 1 }
+		for i := 0; i < len(path)-1; i++ {
+			hopNode := from
+			if i > 0 {
+				for _, nd := range all {
+					if nd.PeerID() == path[i] { hopNode = nd; break }
+				}
+			}
+			w.addTransmission(from.PeerID()[:8]+"-"+to.PeerID()[:8]+"-hop"+string(rune('0'+i)), hopNode, airTicks)
+		}
+	}
+	
 	for i := 1; i < len(path)-1; i++ {
 		for _, nd := range all {
 			if nd.PeerID() == path[i] { nd.AddRelayWork(float64(mb)); break }
@@ -602,4 +642,138 @@ func (w *World) SendFirmwareUpdate(from *Node, target *Node, firmwareBytes int, 
 		w.msgMu.Unlock()
 	}
 	return m
+}
+
+// === Gini & Fairness ===
+
+func (w *World) GiniBalance() float64 {
+	values := make([]float64, 0)
+	for _, n := range w.AllNodes() {
+		// Баланс может быть отрицательным — сдвигаем в >= 0 для Gini
+		v := n.Balance + 100 // сдвиг чтобы избежать отрицательных значений
+		if v < 0 { v = 0 }
+		values = append(values, v)
+	}
+	return gini(values)
+}
+
+func (w *World) GiniReputation() float64 {
+	values := make([]float64, 0)
+	for _, n := range w.AllNodes() {
+		if n.Reputation > 0 {
+			values = append(values, n.Reputation)
+		}
+	}
+	if len(values) == 0 { return 0 }
+	return gini(values)
+}
+
+func (w *World) JainFairness() float64 {
+	values := make([]float64, 0)
+	for _, n := range w.AllNodes() {
+		if n.RelayBytesOut > 0 {
+			values = append(values, n.RelayBytesOut)
+		}
+	}
+	if len(values) < 2 { return 1.0 }
+	sum, sumSq := 0.0, 0.0
+	for _, v := range values { sum += v; sumSq += v * v }
+	if sumSq == 0 { return 0 }
+	return (sum * sum) / (float64(len(values)) * sumSq)
+}
+
+func (w *World) CollisionRate() float64 {
+	done := atomic.LoadInt64(&w.TotalSent)
+	if done == 0 { return 0 }
+	return float64(atomic.LoadInt64(&w.TotalCollisions)) / float64(done)
+}
+
+// === Collision Detection ===
+
+func (w *World) addTransmission(msgID string, from *Node, airTicks int) {
+	w.ActiveTransmissions = append(w.ActiveTransmissions, Transmission{
+		MsgID:     msgID,
+		FromNode:  from,
+		StartTick: w.Tick,
+		EndTick:   w.Tick + airTicks,
+	})
+}
+
+func (w *World) checkCollisions() {
+	rem := w.ActiveTransmissions[:0]
+	// Группируем по overlapping временным окнам
+	for i := 0; i < len(w.ActiveTransmissions); i++ {
+		tx := &w.ActiveTransmissions[i]
+		// Удаляем завершённые
+		if w.Tick > tx.EndTick {
+			continue
+		}
+		collided := false
+		for j := i + 1; j < len(w.ActiveTransmissions); j++ {
+			tx2 := &w.ActiveTransmissions[j]
+			if w.Tick > tx2.EndTick {
+				continue
+			}
+			// Проверяем overlap по времени
+			if tx.EndTick < tx2.StartTick || tx2.EndTick < tx.StartTick {
+				continue
+			}
+			// Проверяем что ноды в LoRa-радиусе
+			if !w.HasConnection(tx.FromNode, tx2.FromNode) {
+				continue
+			}
+			// Коллизия! Оба пакета потеряны
+			tx.FromNode.FailedCount++
+			tx2.FromNode.FailedCount++
+			atomic.AddInt64(&w.TotalCollisions, 2)
+			atomic.AddInt64(&w.TotalFailed, 2)
+			collided = true
+			tx2.FromNode.collideMsg(tx2.MsgID)
+			// Маркируем сообщение в ActiveMessages
+			w.markMsgCollided(tx2.MsgID)
+			break
+		}
+		if !collided {
+			rem = append(rem, *tx)
+		} else {
+			w.markMsgCollided(tx.MsgID)
+		}
+	}
+	w.ActiveTransmissions = rem
+}
+
+func (w *World) markMsgCollided(msgID string) {
+	for i := range w.ActiveMessages {
+		if w.ActiveMessages[i].ID == msgID {
+			w.ActiveMessages[i].Collided = true
+			break
+		}
+	}
+}
+
+func (n *Node) collideMsg(msgID string) {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	n.CollidedCount++
+}
+
+func gini(values []float64) float64 {
+	n := len(values)
+	if n < 2 { return 0 }
+	sorted := make([]float64, n)
+	copy(sorted, values)
+	sort.Float64s(sorted)
+	var sum float64
+	for _, v := range sorted { sum += v }
+	if sum == 0 { return 0 }
+	var cum float64
+	var g float64
+	for i, v := range sorted {
+		cum += v
+		g += float64(2*i - n + 1) * v
+	}
+	result := g / (float64(n) * sum)
+	if result < 0 { result = 0 }
+	if result > 1 { result = 1 }
+	return result
 }

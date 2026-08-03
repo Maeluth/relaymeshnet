@@ -107,3 +107,12 @@ func FragmentsNeeded(packetSize int, sf LoRaSF) int {
 func DutyCycleDelay(airTime float64, dutyCycle float64) float64 {
 	return airTime / dutyCycle
 }
+
+func (sf LoRaSF) AirTimeTicks(bytes int) int {
+	air := sf.AirTime(bytes)
+	ticks := int(air / SecondsPerTick)
+	if ticks < 1 {
+		ticks = 1
+	}
+	return ticks
+}

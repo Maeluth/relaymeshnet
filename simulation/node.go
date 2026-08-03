@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
+	"sync"
 )
 
 type NodeStatus int
@@ -61,10 +62,12 @@ type Node struct {
 	FailedCount   int
 	FileSent      int
 	FileReceived  int
+	CollidedCount int
 
 	nextSendTick   int
 	nextStatusTick int
 
+	mu  sync.Mutex
 	cfg *Config
 }
 

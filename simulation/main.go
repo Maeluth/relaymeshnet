@@ -26,6 +26,8 @@ func main() {
 	http.HandleFunc("/api/scenario/sybil", cors(handleScenarioSybil))
 	http.HandleFunc("/api/scenario/load", cors(handleScenarioLoad))
 	http.HandleFunc("/api/scenario/daynight", cors(handleScenarioDayNight))
+	http.HandleFunc("/api/export/csv", cors(handleExportCSV))
+	http.HandleFunc("/api/sweep", cors(handleSweep))
 	http.Handle("/", http.FileServer(http.Dir("ui")))
 
 	var lastTickCount int
@@ -261,19 +263,24 @@ type UIEvent struct {
 }
 
 type UIStats struct {
-	TotalSent     int     `json:"totalSent"`
-	TotalReceived int     `json:"totalReceived"`
-	TotalFailed   int     `json:"totalFailed"`
-	TotalRelayed  int     `json:"totalRelayed"`
-	TotalRELAY    float64 `json:"totalRelay"`
-	OnlineNodes   int     `json:"onlineNodes"`
-	ActiveMsgs    int     `json:"activeMsgs"`
-	GreenCount    int     `json:"greenCount"`
-	YellowCount   int     `json:"yellowCount"`
-	RedCount      int     `json:"redCount"`
-	TotalSupply   float64 `json:"totalSupply"`
-	TotalTransfers int    `json:"totalTransfers"`
-	TPS           int     `json:"tps"`
+	TotalSent      int     `json:"totalSent"`
+	TotalReceived  int     `json:"totalReceived"`
+	TotalFailed    int     `json:"totalFailed"`
+	TotalRelayed   int     `json:"totalRelayed"`
+	TotalRELAY     float64 `json:"totalRelay"`
+	TotalCollisions int    `json:"totalCollisions"`
+	CollisionRate  float64 `json:"collisionRate"`
+	GiniBalance    float64 `json:"giniBalance"`
+	GiniReputation float64 `json:"giniReputation"`
+	JainFairness   float64 `json:"jainFairness"`
+	OnlineNodes    int     `json:"onlineNodes"`
+	ActiveMsgs     int     `json:"activeMsgs"`
+	GreenCount     int     `json:"greenCount"`
+	YellowCount    int     `json:"yellowCount"`
+	RedCount       int     `json:"redCount"`
+	TotalSupply    float64 `json:"totalSupply"`
+	TotalTransfers int     `json:"totalTransfers"`
+	TPS            int     `json:"tps"`
 }
 
 func worldToState(w *World) UIState {
@@ -290,19 +297,24 @@ func worldToState(w *World) UIState {
 		WiFiRange:  w.Config.WiFiRange,
 		LoRaRange:  w.Config.LoRaRange,
 		Stats: UIStats{
-			TotalSent:     int(atomic.LoadInt64(&w.TotalSent)),
-			TotalReceived: int(atomic.LoadInt64(&w.TotalReceived)),
-			TotalFailed:   int(atomic.LoadInt64(&w.TotalFailed)),
-			TotalRelayed:  int(atomic.LoadInt64(&w.TotalRelayed)),
-			TotalRELAY:    float64(atomic.LoadInt64(&w.TotalRELAY)) / 100.0,
-			OnlineNodes:   len(w.OnlineNodes()),
-			ActiveMsgs:    len(w.ActiveMessages),
-			GreenCount:    w.CountByBalance(10, 1e9),
-			YellowCount:   w.CountByBalance(-50, 10),
-			RedCount:      w.CountByBalance(-1e9, -50),
-			TotalSupply:   w.TotalSupply(),
+			TotalSent:      int(atomic.LoadInt64(&w.TotalSent)),
+			TotalReceived:  int(atomic.LoadInt64(&w.TotalReceived)),
+			TotalFailed:    int(atomic.LoadInt64(&w.TotalFailed)),
+			TotalRelayed:   int(atomic.LoadInt64(&w.TotalRelayed)),
+			TotalRELAY:     float64(atomic.LoadInt64(&w.TotalRELAY)) / 100.0,
+			TotalCollisions: int(atomic.LoadInt64(&w.TotalCollisions)),
+			CollisionRate:  w.CollisionRate(),
+			GiniBalance:    w.GiniBalance(),
+			GiniReputation: w.GiniReputation(),
+			JainFairness:   w.JainFairness(),
+			OnlineNodes:    len(w.OnlineNodes()),
+			ActiveMsgs:     len(w.ActiveMessages),
+			GreenCount:     w.CountByBalance(10, 1e9),
+			YellowCount:    w.CountByBalance(-50, 10),
+			RedCount:       w.CountByBalance(-1e9, -50),
+			TotalSupply:    w.TotalSupply(),
 			TotalTransfers: int(atomic.LoadInt64(&w.TotalTransfers)),
-			TPS:           w.TPS,
+			TPS:            w.TPS,
 		},
 	}
 
@@ -350,4 +362,158 @@ func worldToState(w *World) UIState {
 	}
 
 	return state
+}
+
+// === CSV Export ===
+
+func handleExportCSV(w http.ResponseWriter, r *http.Request) {
+	state := worldToState(world)
+	s := state.Stats
+
+	csv := "metric,value\n"
+	csv += fmt.Sprintf("tick,%d\n", state.Tick)
+	csv += fmt.Sprintf("totalSent,%d\n", s.TotalSent)
+	csv += fmt.Sprintf("totalReceived,%d\n", s.TotalReceived)
+	csv += fmt.Sprintf("totalFailed,%d\n", s.TotalFailed)
+	csv += fmt.Sprintf("totalCollisions,%d\n", s.TotalCollisions)
+	csv += fmt.Sprintf("collisionRate,%.4f\n", s.CollisionRate)
+	csv += fmt.Sprintf("relayCount,%d\n", s.TotalRelayed)
+	csv += fmt.Sprintf("relayVolume,%.0f\n", s.TotalRELAY)
+	csv += fmt.Sprintf("giniBalance,%.4f\n", s.GiniBalance)
+	csv += fmt.Sprintf("giniReputation,%.4f\n", s.GiniReputation)
+	csv += fmt.Sprintf("jainFairness,%.4f\n", s.JainFairness)
+	csv += fmt.Sprintf("totalSupply,%.0f\n", s.TotalSupply)
+	csv += fmt.Sprintf("totalTransfers,%d\n", s.TotalTransfers)
+	csv += fmt.Sprintf("onlineNodes,%d\n", s.OnlineNodes)
+	csv += fmt.Sprintf("greenNodes,%d\n", s.GreenCount)
+	csv += fmt.Sprintf("yellowNodes,%d\n", s.YellowCount)
+	csv += fmt.Sprintf("redNodes,%d\n", s.RedCount)
+	csv += fmt.Sprintf("activeMsgs,%d\n", s.ActiveMsgs)
+	csv += fmt.Sprintf("tps,%d\n", s.TPS)
+
+	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+	w.Header().Set("Content-Disposition", "attachment; filename=rmn_simulation.csv")
+	w.Write([]byte(csv))
+}
+
+// === Parameter Sweep ===
+
+type SweepRequest struct {
+	Iterations   int     `json:"iterations"`
+	TicksPerRun  int     `json:"ticksPerRun"`
+	ParamToSweep string  `json:"paramToSweep"` // "emissionRate", "burnRate", "nodes", etc.
+	RangeMin     float64 `json:"rangeMin"`
+	RangeMax     float64 `json:"rangeMax"`
+	Steps        int     `json:"steps"`
+}
+
+type SweepResult struct {
+	Values []SweepPoint `json:"values"`
+}
+
+type SweepPoint struct {
+	ParamValue     float64 `json:"paramValue"`
+	TotalSent      int     `json:"totalSent"`
+	TotalReceived  int     `json:"totalReceived"`
+	CollisionRate  float64 `json:"collisionRate"`
+	GiniBalance    float64 `json:"giniBalance"`
+	GiniReputation float64 `json:"giniReputation"`
+	JainFairness   float64 `json:"jainFairness"`
+	TotalSupply    float64 `json:"totalSupply"`
+	TotalTransfers int     `json:"totalTransfers"`
+	GreenCount     int     `json:"greenCount"`
+	RedCount       int     `json:"redCount"`
+}
+
+func handleSweep(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		w.WriteHeader(405)
+		return
+	}
+	var req SweepRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "bad request: "+err.Error(), 400)
+		return
+	}
+	if req.Iterations < 1 { req.Iterations = 1 }
+	if req.TicksPerRun < 100 { req.TicksPerRun = 5000 }
+	if req.Steps < 2 { req.Steps = 5 }
+
+	results := runSweep(req)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(results)
+}
+
+func runSweep(req SweepRequest) SweepResult {
+	var result SweepResult
+	step := (req.RangeMax - req.RangeMin) / float64(req.Steps-1)
+
+	for i := 0; i < req.Steps; i++ {
+		paramVal := req.RangeMin + float64(i)*step
+		var sentSum, recvSum, supplySum, transfersSum int64
+		var collSum, giniBSum, giniRSum, jainSum float64
+		var greenSum, redSum int64
+
+		for iter := 0; iter < req.Iterations; iter++ {
+			cfg := DefaultConfig()
+			// Применяем параметр
+			switch req.ParamToSweep {
+			case "emissionRate":
+				cfg.EmissionRate = paramVal
+			case "burnRate":
+				cfg.BurnRate = paramVal
+			case "nodes":
+				cfg.GridWidth = int(paramVal)
+				if cfg.GridWidth < 2 { cfg.GridWidth = 2 }
+			case "gridWidth":
+				cfg.GridWidth = int(paramVal)
+				if cfg.GridWidth < 2 { cfg.GridWidth = 2 }
+			case "gridHeight":
+				cfg.GridHeight = int(paramVal)
+				if cfg.GridHeight < 2 { cfg.GridHeight = 2 }
+			case "wifiRange":
+				cfg.WiFiRange = paramVal
+			case "loraRange":
+				cfg.LoRaRange = paramVal
+			case "sendCost":
+				cfg.SendCost = paramVal
+			case "relayReward":
+				cfg.RelayReward = paramVal
+			case "defaultHops":
+				cfg.DefaultHops = int(paramVal)
+			default:
+				cfg.EmissionRate = paramVal // default sweep
+			}
+
+			w2 := NewWorld(cfg)
+			w2.RunSteps(req.TicksPerRun)
+
+			sentSum += atomic.LoadInt64(&w2.TotalSent)
+			recvSum += atomic.LoadInt64(&w2.TotalReceived)
+			supplySum += int64(w2.TotalSupply())
+			transfersSum += atomic.LoadInt64(&w2.TotalTransfers)
+			collSum += w2.CollisionRate()
+			giniBSum += w2.GiniBalance()
+			giniRSum += w2.GiniReputation()
+			jainSum += w2.JainFairness()
+			greenSum += int64(w2.CountByBalance(10, 1e9))
+			redSum += int64(w2.CountByBalance(-1e9, -50))
+		}
+
+		n := float64(req.Iterations)
+		result.Values = append(result.Values, SweepPoint{
+			ParamValue:     paramVal,
+			TotalSent:      int(float64(sentSum) / n),
+			TotalReceived:  int(float64(recvSum) / n),
+			CollisionRate:  collSum / n,
+			GiniBalance:    giniBSum / n,
+			GiniReputation: giniRSum / n,
+			JainFairness:   jainSum / n,
+			TotalSupply:    float64(supplySum) / n,
+			TotalTransfers: int(float64(transfersSum) / n),
+			GreenCount:     int(float64(greenSum) / n),
+			RedCount:       int(float64(redSum) / n),
+		})
+	}
+	return result
 }

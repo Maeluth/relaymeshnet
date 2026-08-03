@@ -8,6 +8,7 @@ let history = [];
 let flowHistory = [];
 let sysHistory = [];
 let supplyHistory = [];
+let giniHistory = [];
 let lastGraphTick = 0;
 let prevStats = null;
 
@@ -312,12 +313,16 @@ function updateStats() {
     `<div class="stat"><span class="l">Отправлено</span><span class="v g">${s.totalSent}</span></div>`+
     `<div class="stat"><span class="l">Доставлено</span><span class="v g">${s.totalReceived}</span></div>`+
     `<div class="stat"><span class="l">Потеряно</span><span class="v r">${s.totalFailed}</span></div>`+
+    `<div class="stat"><span class="l">Коллизий</span><span class="v" style="color:#f778ba">${(s.totalCollisions||0)} (${((s.collisionRate||0)*100).toFixed(1)}%)</span></div>`+
     `<div class="stat"><span class="l">Успешность</span><span class="v" style="color:${rate>90?'#3fb950':rate>70?'#d29922':'#f85149'}">${rate}%</span></div>`+
     `<div class="stat"><span class="l">Relay (confirm-N)</span><span class="v">${s.totalRelayed}</span></div>`+
     `<div class="stat"><span class="l">RELAY в обороте</span><span class="v y">${s.totalRelay.toFixed(0)}</span></div>`+
     `<div class="stat"><span class="l">В пути</span><span class="v" style="color:#f778ba">${s.activeMsgs}</span></div>`+
     `<div class="stat"><span class="l">Supply</span><span class="v y">${(s.totalSupply||0).toFixed(0)}</span></div>`+
-    `<div class="stat"><span class="l">Трансферов</span><span class="v" style="color:#58a6ff">${(s.totalTransfers||0)}</span></div>`;
+    `<div class="stat"><span class="l">Трансферов</span><span class="v" style="color:#58a6ff">${(s.totalTransfers||0)}</span></div>`+
+    `<div class="stat"><span class="l">Gini баланса</span><span class="v" style="color:${(s.giniBalance||0)<0.5?'#3fb950':'#f85149'}">${(s.giniBalance||0).toFixed(3)}</span></div>`+
+    `<div class="stat"><span class="l">Gini репутации</span><span class="v" style="color:${(s.giniReputation||0)<0.5?'#3fb950':'#f85149'}">${(s.giniReputation||0).toFixed(3)}</span></div>`+
+    `<div class="stat"><span class="l">Jain fairness</span><span class="v" style="color:${(s.jainFairness||1)>0.7?'#3fb950':'#f85149'}">${(s.jainFairness||1).toFixed(3)}</span></div>`;
 }
 
 function updateEvents() {
@@ -365,6 +370,67 @@ async function scenarioLoad(){
 async function scenarioDayNight(prob){
   const p=prob||parseInt(document.getElementById('dayNightProb').value)||30;
   await fetch('/api/scenario/daynight',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({onlineProb:p})});
+}
+
+async function exportCSV() {
+  const resp = await fetch('/api/export/csv');
+  const blob = await resp.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'rmn_simulation.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+async function runSweep() {
+  const param = document.getElementById('sweepParam').value;
+  const rangeRaw = document.getElementById('sweepRange').value;
+  const steps = parseInt(document.getElementById('sweepSteps').value) || 5;
+  const ticks = parseInt(document.getElementById('sweepTicks').value) || 5000;
+  const rangeParts = rangeRaw.split('-').map(Number);
+  const rangeMin = rangeParts[0] || 0.01;
+  const rangeMax = rangeParts[1] || rangeParts[0]*10 || 0.2;
+
+  const resEl = document.getElementById('sweepResult');
+  resEl.innerHTML = '<span style="color:#d29922">Запуск sweep...</span>';
+
+  try {
+    const r = await fetch('/api/sweep', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        iterations: 1,
+        ticksPerRun: ticks,
+        paramToSweep: param,
+        rangeMin: rangeMin,
+        rangeMax: rangeMax,
+        steps: steps
+      })
+    });
+    const data = await r.json();
+    if (!data.values) { resEl.innerHTML = 'Нет данных'; return; }
+
+    let html = '<b>Результаты sweep (' + param + ')</b><br>';
+    html += '<table style="width:100%;border-collapse:collapse;font-size:9px">';
+    html += '<tr style="color:#8b949e"><td>Значение</td><td>Отпр</td><td>Дост</td><td>Coll%</td><td>GiniBal</td><td>Jain</td><td>Supply</td></tr>';
+    for (const p of data.values) {
+      const col = p.collisionRate > 0.3 ? '#f85149' : '#3fb950';
+      html += `<tr style="border-bottom:1px solid #21262d">
+        <td>${p.paramValue.toFixed(3)}</td>
+        <td>${p.totalSent}</td>
+        <td style="color:#3fb950">${p.totalReceived}</td>
+        <td style="color:${col}">${(p.collisionRate*100).toFixed(1)}%</td>
+        <td>${p.giniBalance.toFixed(3)}</td>
+        <td>${p.jainFairness.toFixed(3)}</td>
+        <td>${p.totalSupply.toFixed(0)}</td>
+      </tr>`;
+    }
+    html += '</table>';
+    resEl.innerHTML = html;
+  } catch(e) {
+    resEl.innerHTML = '<span style="color:#f85149">Ошибка sweep</span>';
+  }
 }
 
 function renderGraphs(){
@@ -421,6 +487,20 @@ function renderGraphs(){
     ctx4.fillStyle = '#8b949e';
     ctx4.font = '10px monospace';
     ctx4.fillText('Supply (сумма балансов)', 5, 12);
+  }
+
+  if(giniHistory.length > 1){
+    drawGraph('graph5', [
+      {data: giniHistory.map(h=>h.giniB), color:'#f85149', label:'Gini баланса'},
+      {data: giniHistory.map(h=>h.giniR), color:'#f0883e', label:'Gini репутации'},
+      {data: giniHistory.map(h=>h.jainF), color:'#3fb950', label:'Jain fairness'},
+      {data: giniHistory.map(h=>h.collR*10), color:'#f778ba', label:'Collision% x 10'},
+    ], 1.0);
+    const g5 = document.getElementById('graph5');
+    const ctx5 = g5.getContext('2d');
+    ctx5.fillStyle = '#8b949e';
+    ctx5.font = '10px monospace';
+    ctx5.fillText('Gini / Fairness / Collisions', 5, 12);
   }
 }
 
@@ -484,6 +564,8 @@ async function poll(){
         if(flowHistory.length > 200) flowHistory.shift();
         supplyHistory.push({tick:state.tick, supply:s.totalSupply||0});
         if(supplyHistory.length > 200) supplyHistory.shift();
+        giniHistory.push({tick:state.tick, giniB:s.giniBalance||0, giniR:s.giniReputation||0, jainF:s.jainFairness||1, collR:s.collisionRate||0});
+        if(giniHistory.length > 200) giniHistory.shift();
       }
     }
   }catch(e){}

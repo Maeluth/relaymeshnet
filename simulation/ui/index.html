@@ -65,6 +65,28 @@ button:hover{background:#2ea043}
   <canvas id="graph2" width="320" height="90" style="margin-top:4px;background:#0d1117;border:1px solid #21262d;border-radius:4px"></canvas>
   <canvas id="graph3" width="320" height="75" style="margin-top:4px;background:#0d1117;border:1px solid #21262d;border-radius:4px"></canvas>
   <canvas id="graph4" width="320" height="75" style="margin-top:4px;background:#0d1117;border:1px solid #21262d;border-radius:4px"></canvas>
+  <canvas id="graph5" width="320" height="75" style="margin-top:4px;background:#0d1117;border:1px solid #21262d;border-radius:4px"></canvas>
+
+  <div style="margin-top:6px">
+    <button onclick="exportCSV()" style="background:#1f6feb">Экспорт CSV</button>
+  </div>
+
+  <h2>Parameter Sweep</h2>
+  <div class="ctrl"><label>Параметр:</label><select id="sweepParam" style="width:100%;font-size:10px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;padding:2px 4px">
+    <option value="emissionRate">Emission Rate</option>
+    <option value="burnRate">Burn Rate</option>
+    <option value="nodes">Nodes (Grid Width)</option>
+    <option value="sendCost">Send Cost</option>
+    <option value="relayReward">Relay Reward</option>
+    <option value="defaultHops">Default Hops</option>
+    <option value="wifiRange">WiFi Range</option>
+    <option value="loraRange">LoRa Range</option>
+  </select></div>
+  <div class="ctrl"><label>Диапазон (min-max):</label><input id="sweepRange" placeholder="0.01-0.2" style="width:100%;font-size:10px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;padding:2px 4px"></div>
+  <div class="ctrl"><label>Шагов (steps):</label><input id="sweepSteps" value="5" style="width:100%;font-size:10px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;padding:2px 4px"></div>
+  <div class="ctrl"><label>Тиков за прогон:</label><input id="sweepTicks" value="5000" style="width:100%;font-size:10px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;padding:2px 4px"></div>
+  <button onclick="runSweep()">Запустить Sweep</button>
+  <div id="sweepResult" style="font-size:10px;margin-top:4px;max-height:150px;overflow-y:auto"></div>
 
   <div class="legend">
     <h2>Легенда</h2>
