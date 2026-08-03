@@ -43,6 +43,9 @@ node_modules/
 coverage/
 coverage.out
 
+# Session context (local only)
+SESSION-CONTEXT.md
+
 # Temp
 *.tmp
 *.swp
