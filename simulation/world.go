@@ -49,6 +49,7 @@ type Transmission struct {
 	FromNode  *Node
 	StartTick int
 	EndTick   int
+	SF        LoRaSF
 }
 
 type Event struct {
@@ -396,16 +397,16 @@ func (w *World) sendMsg(from, to *Node, mt MsgType, mb int, online, all []*Node)
 	mts := "text"
 	if mt == MsgFile { mts = "file" }
 	
-	// Track single transmission per sender for collision detection (LoRa only)
+	msgID := from.PeerID()[:8] + "-" + to.PeerID()[:8]
+	// Track collision only for LoRa-range messages (not WiFi)
 	dist := from.DistanceTo(to, w.Config.CellWidth, w.Config.CellHeight)
 	walls, floors := from.WallsBetween(to)
-	msgID := from.PeerID()[:8] + "-" + to.PeerID()[:8]
-	if dist > w.Config.WiFiRange || !w.HasConnection(from, to) || dist > 50 {
-		_, air, _ := from.FragmentsFor(mb, NewLoRaRadio(), dist, walls, floors, w.Config.WallAtten, w.Config.FloorAtten, w.Config.NoiseFloor)
+	if dist > w.Config.WiFiRange && dist <= w.Config.LoRaRange {
+		_, air, sf := from.FragmentsFor(mb, NewLoRaRadio(), dist, walls, floors, w.Config.WallAtten, w.Config.FloorAtten, w.Config.NoiseFloor)
 		airTicks := int(air / SecondsPerTick)
 		if airTicks < 1 { airTicks = 1 }
 		if airTicks > 20 { airTicks = 20 }
-		w.addTransmission(msgID, from, airTicks)
+		w.addTransmission(msgID, from, airTicks, sf)
 	}
 
 	for i := 1; i < len(path)-1; i++ {
@@ -689,21 +690,20 @@ func (w *World) CollisionRate() float64 {
 
 // === Collision Detection ===
 
-func (w *World) addTransmission(msgID string, from *Node, airTicks int) {
+func (w *World) addTransmission(msgID string, from *Node, airTicks int, sf LoRaSF) {
 	w.ActiveTransmissions = append(w.ActiveTransmissions, Transmission{
 		MsgID:     msgID,
 		FromNode:  from,
 		StartTick: w.Tick,
 		EndTick:   w.Tick + airTicks,
+		SF:        sf,
 	})
 }
 
 func (w *World) checkCollisions() {
 	rem := w.ActiveTransmissions[:0]
-	// Группируем по overlapping временным окнам
 	for i := 0; i < len(w.ActiveTransmissions); i++ {
 		tx := &w.ActiveTransmissions[i]
-		// Удаляем завершённые
 		if w.Tick > tx.EndTick {
 			continue
 		}
@@ -713,22 +713,25 @@ func (w *World) checkCollisions() {
 			if w.Tick > tx2.EndTick {
 				continue
 			}
-			// Проверяем overlap по времени
 			if tx.EndTick < tx2.StartTick || tx2.EndTick < tx.StartTick {
 				continue
 			}
-			// Проверяем что ноды в LoRa-радиусе
-			if !w.HasConnection(tx.FromNode, tx2.FromNode) {
+			// Только одинаковый SF коллизирует (SF7/SF9/SF12 ортогональны)
+			if tx.SF != tx2.SF {
 				continue
 			}
-			// Коллизия! Оба пакета потеряны
+			// Только LoRa-радиус (не WiFi)
+			dist := tx.FromNode.DistanceTo(tx2.FromNode, w.Config.CellWidth, w.Config.CellHeight)
+			if dist > w.Config.LoRaRange {
+				continue
+			}
+			// Коллизия!
 			tx.FromNode.FailedCount++
 			tx2.FromNode.FailedCount++
 			atomic.AddInt64(&w.TotalCollisions, 2)
 			atomic.AddInt64(&w.TotalFailed, 2)
 			collided = true
 			tx2.FromNode.collideMsg(tx2.MsgID)
-			// Маркируем сообщение в ActiveMessages
 			w.markMsgCollided(tx2.MsgID)
 			break
 		}
