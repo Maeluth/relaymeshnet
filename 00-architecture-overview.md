@@ -81,3 +81,6 @@
 - `26-identity-export.md` 🟡 — экспорт/импорт identity: зашифрованный бэкап, cross-device sync, физический перенос
 - `27-cold-restart.md` 🟡 — холодный рестарт сети: фазы восстановления, частичный/полный cold restart, новый старт
 - `28-sovereignty-clans.md` 🟡 — суверенитеты и кланы: социальный слой доверия, белые/серые/чёрные зоны, бан-листы, добровольная федерация
+- `29-hal-spec.md` 🟡 — Hardware Abstraction Layer: автоопределение CPU/RAM/радио, serial-протокол ESP32, адаптация конфигурации под железо
+- `30-device-profile.md` 🟡 — Device Profile: автоопределение роли (relay/node/bridge), генерация identity, сохранение конфигурации
+- `31-ota-updates.md` 🟡 — OTA Updates: безопасное обновление через mesh, подпись Ed25519, BitTorrent-загрузка, откат при ошибке, частичное обновление

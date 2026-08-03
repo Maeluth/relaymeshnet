@@ -2,7 +2,7 @@
 
 **Decentralized mesh network with built-in tokenomics — designed to work without internet.**
 
-[![Architecture](https://img.shields.io/badge/modules-29-blue)]()
+[![Architecture](https://img.shields.io/badge/modules-32-blue)]()
 [![Simulation](https://img.shields.io/badge/simulation-Go-green)]()
 [![Stage](https://img.shields.io/badge/stage-design%20%2B%20simulation-orange)]()
 
@@ -99,6 +99,9 @@ go run .
 | 26 | Identity export/import (encrypted backup, cross-device sync, physical transfer) |
 | 27 | Cold restart (recovery phases, partial/full restart, fresh network bootstrap) |
 | 28 | Sovereignty & clans (social trust layer, white/grey/black zones, ban lists) |
+| 29 | HAL spec (hardware auto-detection, ESP32 serial protocol, adaptation) |
+| 30 | Device profile (auto role detection, identity generation, runtime config) |
+| 31 | OTA updates (signed firmware, BitTorrent download, rollback, partial updates) |
 
 ## Status
 
