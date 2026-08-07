@@ -217,9 +217,9 @@ func (n *Node) Tick() {
 	}
 }
 
-func (n *Node) AddRelayWork(bytes float64) {
+func (n *Node) AddRelayWork(bytes float64, multiplier float64) {
 	n.RelayBytesOut += bytes
-	reward := bytes / 1024.0 * n.cfg.RelayReward
+	reward := bytes / 1024.0 * n.cfg.RelayReward * multiplier
 	burn := reward * n.cfg.BurnRate
 	n.Balance += reward - burn
 	n.EWMAWork += bytes

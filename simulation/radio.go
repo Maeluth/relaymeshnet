@@ -116,3 +116,19 @@ func (sf LoRaSF) AirTimeTicks(bytes int) int {
 	}
 	return ticks
 }
+
+func (sf LoRaSF) RelayMultiplier() float64 {
+	switch sf {
+	case SF7:
+		return 1.0
+	case SF9:
+		return 1.5
+	case SF12:
+		return 3.0
+	}
+	return 1.0
+}
+
+func WiFiRelayMultiplier() float64 {
+	return 0.1
+}

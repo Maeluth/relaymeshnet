@@ -10,7 +10,6 @@ simulation/mesh-sim.exe
 # Go
 *.test
 *.out
-go.sum
 
 # OS
 .DS_Store

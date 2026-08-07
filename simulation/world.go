@@ -398,20 +398,27 @@ func (w *World) sendMsg(from, to *Node, mt MsgType, mb int, online, all []*Node)
 	if mt == MsgFile { mts = "file" }
 	
 	msgID := from.PeerID()[:8] + "-" + to.PeerID()[:8]
-	// Track collision only for LoRa-range messages (not WiFi)
+	// Определяем канал и мультипликатор для relay-вознаграждения
 	dist := from.DistanceTo(to, w.Config.CellWidth, w.Config.CellHeight)
 	walls, floors := from.WallsBetween(to)
-	if dist > w.Config.WiFiRange && dist <= w.Config.LoRaRange {
-		_, air, sf := from.FragmentsFor(mb, NewLoRaRadio(), dist, walls, floors, w.Config.WallAtten, w.Config.FloorAtten, w.Config.NoiseFloor)
-		airTicks := int(air / SecondsPerTick)
-		if airTicks < 1 { airTicks = 1 }
-		if airTicks > 20 { airTicks = 20 }
-		w.addTransmission(msgID, from, airTicks, sf)
+	relayMultiplier := 1.0
+	if dist <= w.Config.WiFiRange {
+		snr := NewWiFiRadio().SNR(dist, walls, floors, w.Config.WallAtten, w.Config.FloorAtten, w.Config.NoiseFloor)
+		if PacketSuccessRate(snr) > 0.1 {
+			relayMultiplier = WiFiRelayMultiplier()
+		}
+	} else if dist <= w.Config.LoRaRange {
+		_, _, sf := from.FragmentsFor(mb, NewLoRaRadio(), dist, walls, floors, w.Config.WallAtten, w.Config.FloorAtten, w.Config.NoiseFloor)
+		relayMultiplier = sf.RelayMultiplier()
+		airTicks := int(sf.AirTimeTicks(mb))
+		if airTicks > 0 && airTicks <= 20 {
+			w.addTransmission(msgID, from, airTicks, sf)
+		}
 	}
 
 	for i := 1; i < len(path)-1; i++ {
 		for _, nd := range all {
-			if nd.PeerID() == path[i] { nd.AddRelayWork(float64(mb)); break }
+			if nd.PeerID() == path[i] { nd.AddRelayWork(float64(mb), relayMultiplier); break }
 		}
 	}
 	return &ActiveMsg{
