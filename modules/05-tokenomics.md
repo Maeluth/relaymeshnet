@@ -44,7 +44,7 @@ SF12-узлы (плохой сигнал, дальние дистанции) п�
 | `CREDIT_BASE` | 0 | Новый узел НЕ получает бесплатных кредитов |
 | `CREDIT_LIMIT_FACTOR` | 20 × sqrt(reputation) | Лимит кредитной линии от репутации |
 | `RELAY_REWARD` | 1 RELAY / chunk (512 байт) | Вознаграждение за relay, ×channelMultiplier |
-| `SEND_COST` | 2 RELAY / chunk / hop | Стоимость отправки (sender платит вдвое больше relay-заработка) |
+| `SEND_COST` | 1 RELAY / chunk / hop | Стоимость отправки (sender платит столько же сколько зарабатывает 1 relay) |
 | `EMISSION_RATE` | 0.5 RELAY / chunk | Эмиссия за каждый чанк confirm-N (чётный N = целое) |
 | `STORAGE_REWARD` | 0.01 credit / MB / час | Вознаграждение за хранение контента |
 | `DHT_MIRROR_REWARD` | 0.001 credit / запись / час | Вознаграждение за DHT-зеркалирование |
