@@ -114,7 +114,39 @@ go run .
 
 ## Status
 
-**Pre-MVP.** Architecture (29 modules) and simulation are complete. Physical hardware testing targeted to begin early 2027. Development is ongoing — there is no planned end date. The project evolves as long as there are contributors and users.
+**Pre-MVP.** Architecture (40 modules) and simulation are complete. **Production code is in active development.**
+
+### Production Code (pkg/)
+
+Nine production packages implementing the core protocol:
+
+- **pkg/crypto** — Ed25519 signatures, X25519 DH, X3DH handshake, Double Ratchet
+- **pkg/identity** — PeerID generation (SHA256 of public key)
+- **pkg/protocol** — Wire format, message types (chat, file, DHT, etc.)
+- **pkg/onion** — Onion routing with multi-layer encryption
+- **pkg/dht** — Distributed hash table (Kademlia-like routing)
+- **pkg/poh** — Proof of History for timestamping
+- **pkg/economy** — Tokenomics, reputation, confirm-N, burn mechanism
+- **pkg/relay** — Relay queue with priority and hop-by-hop ACK
+- **pkg/transport** — Transport interface + mock implementation
+
+Run the demo:
+```bash
+go run ./cmd/demo
+```
+
+### Simulation
+
+Go-based simulation with WebUI for testing economic models and network behavior:
+```bash
+cd simulation
+go run .
+# Open http://localhost:8080
+```
+
+### Roadmap
+
+Physical hardware testing targeted to begin early 2027. Development is ongoing — there is no planned end date. The project evolves as long as there are contributors and users.
 
 ## Author
 
