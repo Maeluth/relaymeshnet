@@ -16,7 +16,8 @@ import (
 )
 
 func main() {
-	fmt.Println("=== RelayMeshNet Production Code Demo ===\n")
+	fmt.Println("=== RelayMeshNet Production Code Demo ===")
+	fmt.Println()
 
 	// 1. Identity & Crypto
 	fmt.Println("1. Generating identities...")
@@ -162,8 +163,10 @@ func main() {
 	aliceTransport.Send(bobID, []byte("Hello via transport!"))
 	time.Sleep(100 * time.Millisecond)
 
-	fmt.Println("\n=== Demo Complete ===")
-	fmt.Println("\nProduction packages:")
+	fmt.Println()
+	fmt.Println("=== Demo Complete ===")
+	fmt.Println()
+	fmt.Println("Production packages:")
 	fmt.Println("  ✓ pkg/crypto     - Ed25519, X3DH, Double Ratchet")
 	fmt.Println("  ✓ pkg/identity   - PeerID generation")
 	fmt.Println("  ✓ pkg/protocol   - Wire format, message types")
