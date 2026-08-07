@@ -62,7 +62,7 @@ func DefaultConfig() Config {
 		RelayReward:      1.0,
 		SendCost:         1.0,
 		StorageReward:    0.01,
-		EmissionRate:     0.1,
+		EmissionRate:     0.5,
 		BurnRate:         0.01,
 		MinRelayHops:     1,
 		MaxRelayHops:     3,

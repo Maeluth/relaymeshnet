@@ -219,7 +219,7 @@ func (n *Node) Tick() {
 
 func (n *Node) AddRelayWork(bytes float64, multiplier float64) {
 	n.RelayBytesOut += bytes
-	reward := bytes / 1024.0 * n.cfg.RelayReward * multiplier
+	reward := bytes / float64(n.cfg.RelayChunkSize) * n.cfg.RelayReward * multiplier
 	burn := reward * n.cfg.BurnRate
 	n.Balance += reward - burn
 	n.EWMAWork += bytes

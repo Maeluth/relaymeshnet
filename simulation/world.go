@@ -370,7 +370,7 @@ func (w *World) sendMsg(from, to *Node, mt MsgType, mb int, online, all []*Node)
 	if ch < 1 { ch = 1 }
 	cn := from.ConfirmNRequired(mb, ch)
 	if cn < 0 {
-		cost := float64(rc*mb) / 1024.0 * from.cfg.SendCost
+		cost := float64(rc*mb) / float64(from.cfg.RelayChunkSize) * from.cfg.SendCost
 		if cost > 0 && from.Available() < cost && from.Balance-cost < -from.CreditLimit() { return nil }
 		if cost > 0 {
 			burn := cost * from.cfg.BurnRate
@@ -382,9 +382,9 @@ func (w *World) sendMsg(from, to *Node, mt MsgType, mb int, online, all []*Node)
 		}
 	}
 	if cn > 0 {
-		// Эмиссия только если relay-очередь не пуста (упрощённо: 80% шанс)
+		// Эмиссия: N chunks × EmissionRate (1 RELAY за чанк, целое)
 		if rand.Float64() < 0.8 {
-			emission := float64(cn*from.cfg.RelayChunkSize) / 1024.0 * from.cfg.EmissionRate
+			emission := float64(cn) * from.cfg.EmissionRate
 			from.Balance += emission
 			atomic.AddInt64(&w.TotalEmission, int64(emission*100))
 		}

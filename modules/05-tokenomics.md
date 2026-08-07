@@ -40,10 +40,12 @@ SF12-узлы (плохой сигнал, дальние дистанции) п�
 
 | Параметр | Значение | Описание |
 |---|---|---|
+| `RELAY_CHUNK_SIZE` | 512 байт | 1 RELAY = relay 1 чанка через SF7 |
 | `CREDIT_BASE` | 0 | Новый узел НЕ получает бесплатных кредитов |
 | `CREDIT_LIMIT_FACTOR` | 20 × sqrt(reputation) | Лимит кредитной линии от репутации |
-| `RELAY_REWARD` | 1 credit / KB (SF7 baseline) | Вознаграждение за relay, ×channelMultiplier |
-| `SEND_COST` | 1 credit / KB / hop | Стоимость отправки (не зависит от канала — сендер платит фиксированно) |
+| `RELAY_REWARD` | 1 RELAY / chunk (512 байт) | Вознаграждение за relay, ×channelMultiplier |
+| `SEND_COST` | 2 RELAY / chunk / hop | Стоимость отправки (sender платит вдвое больше relay-заработка) |
+| `EMISSION_RATE` | 0.5 RELAY / chunk | Эмиссия за каждый чанк confirm-N (чётный N = целое) |
 | `STORAGE_REWARD` | 0.01 credit / MB / час | Вознаграждение за хранение контента |
 | `DHT_MIRROR_REWARD` | 0.001 credit / запись / час | Вознаграждение за DHT-зеркалирование |
 | `BURN_RATE` | 0.01 | 1% от каждой транзакции сжигается |
