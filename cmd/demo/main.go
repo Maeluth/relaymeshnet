@@ -114,7 +114,7 @@ func main() {
 		{PeerID: [32]byte{2}, PubKey: bob.DHPub},
 	}
 
-	onionPkt, err := onion.BuildCircuit([]byte("Secret message"), hops2, alice.DHKey)
+	onionPkt, err := onion.BuildCircuit([]byte("Secret message"), hops2)
 	if err != nil {
 		fmt.Printf("   Error: %v\n", err)
 	} else {

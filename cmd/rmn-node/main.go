@@ -61,17 +61,13 @@ func NewNode(name string, tr transport.Transport) (*Node, error) {
 		peers:       make(map[string]*PeerSession),
 	}
 
-	bundle, err := ik.NewPreKeyBundle(5)
-	if err != nil {
-		return nil, err
-	}
-	n.PreKeyStore = bundle
-
+	otks := make([][32]byte, 5)
 	for i := uint32(0); i < 5; i++ {
 		pk, _ := crypto.GenerateDH()
 		n.PreKeys[i] = pk
-		n.PreKeyStore.OneTimePreKeys[i] = pk.PubKey
+		otks[i] = pk.PubKey
 	}
+	n.PreKeyStore = crypto.NewPreKeyBundle(ik, spk.PubKey, otks)
 
 	fmt.Printf("[%s] PeerID: %s\n", name, n.PeerID[:8])
 	return n, nil

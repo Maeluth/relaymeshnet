@@ -10,11 +10,13 @@ import (
 	"golang.org/x/crypto/curve25519"
 )
 
+// IdentityKeypair holds both Ed25519 (signing) and X25519 (DH) keys
+// derived from the same seed.
 type IdentityKeypair struct {
 	PubKey  ed25519.PublicKey
 	PrivKey ed25519.PrivateKey
-	DHKey   [32]byte // Curve25519 private key derived from same seed
-	DHPub   [32]byte // Curve25519 public key
+	DHKey   [32]byte // X25519 private key
+	DHPub   [32]byte // X25519 public key
 }
 
 func GenerateIdentity() (*IdentityKeypair, error) {
@@ -45,16 +47,11 @@ func (ik *IdentityKeypair) Sign(data []byte) []byte {
 	return ed25519.Sign(ik.PrivKey, data)
 }
 
-func (ik *IdentityKeypair) Verify(data, sig []byte) bool {
-	return ed25519.Verify(ik.PubKey, data, sig)
+func Verify(pub ed25519.PublicKey, data, sig []byte) bool {
+	return ed25519.Verify(pub, data, sig)
 }
 
 func (ik *IdentityKeypair) PeerID() string {
 	h := sha256.Sum256(ik.PubKey)
 	return hex.EncodeToString(h[:16])
-}
-
-func VerifyPeerID(pubKey ed25519.PublicKey, peerID string) bool {
-	h := sha256.Sum256(pubKey)
-	return hex.EncodeToString(h[:16]) == peerID
 }

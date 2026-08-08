@@ -1,51 +1,33 @@
 package crypto
 
-import (
-	"crypto/ed25519"
-	"encoding/binary"
-)
+import "crypto/ed25519"
 
+// PreKeyBundle is published by a node to allow others to initiate X3DH.
+// IdentityKey is Ed25519 (signing). DHPub, SignedPreKey, OneTimePreKeys are X25519.
 type PreKeyBundle struct {
-	IdentityKey      ed25519.PublicKey
-	DHPub            [32]byte // Curve25519 pub key from identity
-	SignedPreKey     [32]byte // Curve25519 pub
-	SignedPreKeySig  []byte   // Ed25519 signature of SignedPreKey by IdentityKey
-	OneTimePreKeys   [][32]byte // Curve25519 pub (single-use)
+	IdentityKey     ed25519.PublicKey
+	DHPub           [32]byte // X25519 pub from identity (derived from same seed)
+	SignedPreKey    [32]byte // X25519 pub (medium-term)
+	SignedPreKeySig []byte   // Ed25519 signature of SignedPreKey by IdentityKey
+	OneTimePreKeys  [][32]byte // X25519 pub (single-use)
 }
 
-type SignedPreKeyRecord struct {
-	Key       [32]byte
-	Signature []byte
-	Serial    uint32
-}
-
-func (ik *IdentityKeypair) NewPreKeyBundle(onetimeCount int) (*PreKeyBundle, error) {
-	spk, err := GenerateDH()
-	if err != nil {
-		return nil, err
-	}
-	serial := make([]byte, 4)
-	binary.BigEndian.PutUint32(serial, 0)
-	spkSig := ik.Sign(spk.PubKey[:])
-
-	otks := make([][32]byte, onetimeCount)
-	for i := range otks {
-		k, err := GenerateDH()
-		if err != nil {
-			return nil, err
-		}
-		otks[i] = k.PubKey
-	}
-
+// NewPreKeyBundle creates a bundle signed by the identity key.
+// The caller provides the SPK and OTKs.
+func NewPreKeyBundle(ik *IdentityKeypair, spkPub [32]byte, otks [][32]byte) *PreKeyBundle {
+	spkSig := ed25519.Sign(ik.PrivKey, spkPub[:])
 	return &PreKeyBundle{
 		IdentityKey:     ik.PubKey,
 		DHPub:           ik.DHPub,
-		SignedPreKey:    spk.PubKey,
+		SignedPreKey:    spkPub,
 		SignedPreKeySig: spkSig,
 		OneTimePreKeys:  otks,
-	}, nil
+	}
 }
 
-func (pkb *PreKeyBundle) Verify(identityPub ed25519.PublicKey) bool {
-	return ed25519.Verify(identityPub, pkb.SignedPreKey[:], pkb.SignedPreKeySig)
+// VerifyBundle checks that the SignedPreKey is signed by the IdentityKey.
+// This is NOT self-referential: the caller must already know the IdentityKey
+// (e.g. from a trusted source or DHT lookup).
+func (pkb *PreKeyBundle) VerifyBundle() bool {
+	return ed25519.Verify(pkb.IdentityKey, pkb.SignedPreKey[:], pkb.SignedPreKeySig)
 }

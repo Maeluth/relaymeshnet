@@ -3,6 +3,7 @@ package dht
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"sort"
 	"sync"
 	"time"
 )
@@ -57,7 +58,7 @@ func LeadingZeros(k Key) int {
 			count += 8
 		} else {
 			for j := 7; j >= 0; j-- {
-				if k[i]&(1<<j) == 0 {
+				if k[i]&(1<<byte(j)) == 0 {
 					count++
 				} else {
 					return count
@@ -85,17 +86,34 @@ func NewBucket() *Bucket {
 	}
 }
 
-func (b *Bucket) Add(node *Node) {
+func (b *Bucket) Add(node *Node) bool {
 	for i, existing := range b.nodes {
 		if existing.ID == node.ID {
 			b.nodes[i].LastSeen = time.Now()
-			return
+			return true
 		}
 	}
 
+	node.LastSeen = time.Now()
+
 	if len(b.nodes) < BucketSize {
 		b.nodes = append(b.nodes, node)
+		return true
 	}
+
+	// Eviction: if the oldest node hasn't been seen recently, replace it
+	oldest := 0
+	for i, n := range b.nodes {
+		if n.LastSeen.Before(b.nodes[oldest].LastSeen) {
+			oldest = i
+		}
+	}
+	if time.Since(b.nodes[oldest].LastSeen) > 15*time.Minute {
+		b.nodes[oldest] = node
+		return true
+	}
+
+	return false
 }
 
 func (b *Bucket) Remove(id Key) {
@@ -133,9 +151,9 @@ func NewTable(selfID Key) *Table {
 	return t
 }
 
-func (t *Table) Add(node *Node) {
+func (t *Table) Add(node *Node) bool {
 	if node.ID == t.selfID {
-		return
+		return false
 	}
 
 	distance := XOR(t.selfID, node.ID)
@@ -147,7 +165,7 @@ func (t *Table) Add(node *Node) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	t.buckets[bucketIndex].Add(node)
+	return t.buckets[bucketIndex].Add(node)
 }
 
 func (t *Table) Remove(id Key) {
@@ -163,37 +181,40 @@ func (t *Table) Remove(id Key) {
 	t.buckets[bucketIndex].Remove(id)
 }
 
+// Closest returns up to count nodes sorted by XOR distance to target (ascending).
 func (t *Table) Closest(target Key, count int) []*Node {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 
-	var allNodes []*Node
-	for _, bucket := range t.buckets {
-		allNodes = append(allNodes, bucket.Nodes()...)
-	}
-
-	// Sort by distance to target
 	type nodeDist struct {
 		node *Node
-		dist Key
+		dist [KeySize]byte
 	}
 
-	var withDist []nodeDist
-	for _, node := range allNodes {
-		withDist = append(withDist, nodeDist{
-			node: node,
-			dist: XOR(target, node.ID),
-		})
+	var all []nodeDist
+	for _, bucket := range t.buckets {
+		for _, node := range bucket.Nodes() {
+			d := XOR(target, node.ID)
+			all = append(all, nodeDist{node: node, dist: d})
+		}
 	}
 
-	// Simple selection: take first 'count' nodes
-	// In production, sort by distance
-	if len(withDist) > count {
-		withDist = withDist[:count]
+	sort.Slice(all, func(i, j int) bool {
+		a, b := all[i].dist, all[j].dist
+		for k := 0; k < KeySize; k++ {
+			if a[k] != b[k] {
+				return a[k] < b[k]
+			}
+		}
+		return false
+	})
+
+	if len(all) > count {
+		all = all[:count]
 	}
 
-	result := make([]*Node, len(withDist))
-	for i, nd := range withDist {
+	result := make([]*Node, len(all))
+	for i, nd := range all {
 		result[i] = nd.node
 	}
 
